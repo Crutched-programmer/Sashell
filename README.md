@@ -1,9 +1,9 @@
-# SaShell v0.9.0
+# SaShell v1.0.0
 
 Real Linux shell with Sarvam AI as your safety net. Type real commands — AI only steps in when something looks dangerous, broken, or funny.
 
 ---
-
+## Current changes: Added more fortune lnes, a moving gradient on the 'sashell' opening screen and fixed stuff. ( fixed stuff becuase the fortune line told me that my next commit would have that phrase)
 ## Installation
 
 ```bash
