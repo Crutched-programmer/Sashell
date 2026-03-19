@@ -13,7 +13,7 @@ import os, sys, subprocess, random, json, re, textwrap, shutil, base64, tempfile
 import urllib.request, urllib.error
 import shutil as _shutil
 
-VERSION = "1.0.0"
+VERSION = "0.9.0"
 
 # ── Colours ─────────────────────────────────────────────────────────────────────
 RESET    = "\033[0m"
@@ -56,10 +56,15 @@ FORTUNES = [
     "Have you tried turning it off and on again? Seriously.",
     "Your longest function is also your biggest regret.",
     "chmod 777 is not a solution. It's a cry for help.",
+    "The bug you are looking for is in the last place you look.",
+    "A rubber duck is your best debugging partner. Talk to it more.",
+    "The code you write while tired will be the code you debug while sober.",
+    "This is too much for you to handle, go touch some grass.",
 ]
 
 # ── Easter eggs ──────────────────────────────────────────────────────────────────
 LOCAL_EGGS = {
+    # greetings
     "sudo make me a sandwich": f"{MAGENTA}🥪  Okay okay... *makes sandwich* ...but just this once.{RESET}",
     "what is love":            f"{MAGENTA}💘  Baby don't hurt me... don't hurt me... no more. (also: 42){RESET}",
     "meaning of life":         f"{LIME}✨  42. Obviously. Now go break something.{RESET}",
@@ -67,6 +72,40 @@ LOCAL_EGGS = {
     "why":                     f"{AMBER}🤔  Because entropy demands it.{RESET}",
     "hello":                   f"{CYAN}👋  Namaste! Ready to break something?{RESET}",
     "hi":                      f"{CYAN}👋  Hey. Let's do something dangerous together.{RESET}",
+    # tech humour
+    "have you tried turning it off and on again": f"{LIME}💡  Step 1 of every IT certification.{RESET}",
+    "git blame":               f"{AMBER}🫵  It was you. It's always you.{RESET}",
+    "it works on my machine":  f"{MAGENTA}🚢  Then we'll ship your machine.{RESET}",
+    "undefined is not a function": f"{RED}💀  JavaScript sends its regards.{RESET}",
+    "sudo":                    f"{MAGENTA}⚡  With great power comes great sudo -i.{RESET}",
+    "segfault":                f"{RED}💥  Core dumped. So was my confidence.{RESET}",
+    "stack overflow":          f"{CYAN}🔁  Maximum recursion depth exceeded in life.{RESET}",
+    "kubernetes":              f"{LAVENDER}☸  You don't need Kubernetes. Nobody needs Kubernetes.{RESET}",
+    "docker":                  f"{CYAN}🐳  Works in container. Nowhere else. Perfect.{RESET}",
+    "vim":                     f"{LIME}📝  Type :q! and walk away. Save yourself.{RESET}",
+    "nano":                    f"{GREEN}✅  A person of culture, I see.{RESET}",
+    "emacs":                   f"{AMBER}🤯  An operating system with a text editor problem.{RESET}",
+    "windows":                 f"{MAGENTA}🪟  Have you tried Linux? Asking for a friend.{RESET}",
+    "mac":                     f"{GREY}🍎  At least the terminal looks good.{RESET}",
+    "arch linux":              f"{CYAN}🧢  I use Arch btw... wait, you already knew.{RESET}",
+    "i use arch btw":          f"{CYAN}🏆  We know. Everyone knows.{RESET}",
+    "blockchain":              f"{AMBER}⛓  A distributed way to complicate everything.{RESET}",
+    "ai will replace us":      f"{LIME}🤖  I'm literally an AI shell. So... maybe?{RESET}",
+    "machine learning":        f"{MAGENTA}🧠  Finds patterns in your confusion since 2012.{RESET}",
+    "pip install":             f"{AMBER}📦  Dependency hell, initiated.{RESET}",
+    "node_modules":            f"{RED}🕳️  The heaviest object in the known universe.{RESET}",
+    "javascript":              f"{AMBER}🤡  NaN === NaN is false. You're welcome.{RESET}",
+    "python 2":                f"{RED}☠  Time of death: January 1, 2020. R.I.P.{RESET}",
+    "merge conflict":          f"{RED}😤  Pick a side. Any side. Just commit.{RESET}",
+    "it is what it is":        f"{GREY}🤷  Classic senior engineer response.{RESET}",
+    "yolo":                    f"{MAGENTA}🎲  git push --force --no-verify energy detected.{RESET}",
+    "help me":                 f"{CYAN}🤝  Type --help. Or just scream into the terminal.{RESET}",
+    "i am bored":              f"{LIME}😴  Have you tried rm -rf on your boredom? (don't){RESET}",
+    "good morning":            f"{AMBER}☀️  Morning! Hope your cron jobs ran clean.{RESET}",
+    "good night":              f"{LAVENDER}🌙  Sleep well. Your background processes won't.{RESET}",
+    "thank you":               f"{LIME}💚  Just doing my job. Unlike your tests.{RESET}",
+    "thanks":                  f"{LIME}💚  You're welcome. Now go write some docs.{RESET}",
+    "bye":                     f"{CYAN}👋  Leaving so soon? The terminal misses you already.{RESET}",
 }
 
 # ── Dangerous patterns ───────────────────────────────────────────────────────────
@@ -262,15 +301,65 @@ def get_api_key():
     return key
 
 # ── UI helpers ───────────────────────────────────────────────────────────────────
+ASCII_LOGO = [
+    " ██████╗ █████╗  ██████╗██╗  ██╗███████╗██╗     ██╗",
+    "██╔════╝██╔══██╗██╔════╝██║  ██║██╔════╝██║     ██║",
+    "╚█████╗ ███████║╚█████╗ ███████║█████╗  ██║     ██║",
+    " ╚═══██╗██╔══██║ ╚═══██╗██╔══██║██╔══╝  ██║     ██║",
+    "██████╔╝██║  ██║██████╔╝██║  ██║███████╗███████╗███████╗",
+    "╚═════╝ ╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝",
+]
+
+# Gradient colour stops: lime → cyan → magenta
+GRAD_COLOURS = [
+    "\033[38;5;154m",  # lime
+    "\033[38;5;148m",
+    "\033[38;5;118m",
+    "\033[38;5;84m",
+    "\033[38;5;51m",   # cyan
+    "\033[38;5;45m",
+    "\033[38;5;39m",
+    "\033[38;5;198m",  # magenta
+]
+
+def _gradient_line(line, offset):
+    """Apply a scrolling colour gradient to a single ASCII line."""
+    out = ""
+    n = len(GRAD_COLOURS)
+    for i, ch in enumerate(line):
+        col = GRAD_COLOURS[(i // 6 + offset) % n]
+        out += col + ch
+    return out + RESET
+
+def _print_logo_frame(offset):
+    """Print logo with a given gradient offset."""
+    for line in ASCII_LOGO:
+        print("  " + _gradient_line(line, offset))
+
 def banner():
-    print(f"\n{LIME}{BOLD}", end="")
-    print(__doc__, end="")
-    print(RESET)
-    print(f"{GREY}  {random.choice(BOOT_MESSAGES)}{RESET}\n")
+    import time
+    os.system("clear")
+
+    # Animate gradient: cycle through offsets
+    try:
+        for frame in range(24):
+            # Move cursor to top each frame after first
+            if frame > 0:
+                print(f"\033[{len(ASCII_LOGO) + 1}A", end="")
+            _print_logo_frame(frame)
+            print()
+            time.sleep(0.045)
+    except Exception:
+        # fallback: just print static
+        _print_logo_frame(0)
+        print()
+
+    print(f"  {GREY}Real Linux shell · Sarvam AI safety net · v{VERSION}{RESET}")
+    print(f"  {GREY}{random.choice(BOOT_MESSAGES)}{RESET}\n")
     print(f"{DIM}  Type real Linux commands. AI watches for mistakes & danger.{RESET}")
     tts_status = f"{GREEN}ON ({TTS_VOICE}){RESET}" if TTS_ENABLED else f"{GREY}OFF{RESET}"
     lang_status = f"{CYAN}{SHELL_LANG}{RESET}"
-    print(f"{DIM}  TTS: {tts_status}  │  Lang: {lang_status}  │  Say {BOLD}\"i wanna talk with you\"{RESET}{DIM} for chat.  {BOLD}--help{RESET}{DIM} for guide.{RESET}\n")
+    print(f"{DIM}  TTS: {tts_status}  │  Lang: {lang_status}  │  {BOLD}\"i wanna talk with you\"{RESET}{DIM} → chat  │  {BOLD}--help{RESET}{DIM} → guide{RESET}\n")
 
 def shell_prompt():
     cwd = os.getcwd().replace(os.path.expanduser("~"), "~")
@@ -316,71 +405,166 @@ def print_chat_reply(text):
 def show_help():
     tts = f"{GREEN}ON  ({TTS_VOICE}){RESET}" if TTS_ENABLED else f"{GREY}OFF{RESET}"
     print(f"""
-{LIME}{BOLD}  SaShell v{VERSION} — Command Reference{RESET}
-{GREY}  ══════════════════════════════════════════════════════{RESET}
+{LIME}{BOLD}  SaShell v{VERSION} — Full Command Reference{RESET}
+{GREY}  ══════════════════════════════════════════════════════════════{RESET}
 
-{CYAN}{BOLD}  SHELL MODE{RESET} {GREY}(default — just type Linux commands){RESET}
-  {GREY}────────────────────────────────────────────────────{RESET}
-  {AMBER}ls -la{RESET}                    list files with details
-  {AMBER}cd <dir>{RESET}                  change directory
-  {AMBER}cat <file>{RESET}                print file contents
-  {AMBER}grep <pattern> <file>{RESET}     search inside files
-  {AMBER}find . -name "*.py"{RESET}       find files by pattern
-  {AMBER}ps aux{RESET}                    show running processes
-  {AMBER}df -h{RESET}                     disk usage
-  {AMBER}free -h{RESET}                   memory usage
-  {AMBER}top / htop{RESET}                live process monitor
-  {AMBER}uname -r{RESET}                  kernel version
-  {AMBER}ip addr show{RESET}              network interfaces
-  {AMBER}ss -tuln{RESET}                  open ports
-  {AMBER}uptime{RESET}                    system uptime
-  {AMBER}who{RESET}                       who is logged in
-  {AMBER}env{RESET}                       environment variables
-  {AMBER}history{RESET}                   command history
-  {AMBER}tar -czf out.tar.gz dir/{RESET}  compress a folder
-  {AMBER}curl <url>{RESET}                fetch a URL
-  {AMBER}ping <host>{RESET}               ping a host
-  {AMBER}du -ah . | sort -rh | head -5{RESET}  top 5 biggest files
-  {AMBER}chmod +x script.sh{RESET}        make script executable
-  {AMBER}tail -f /var/log/syslog{RESET}   follow a log file
+{CYAN}{BOLD}  FILE & DIRECTORY{RESET}
+  {GREY}──────────────────────────────────────────────────────────────{RESET}
+  {AMBER}ls -la{RESET}                      list all files with details & hidden
+  {AMBER}ls -lh{RESET}                      human readable sizes
+  {AMBER}cd <dir>{RESET}  /  {AMBER}cd ..{RESET}  /  {AMBER}cd ~{RESET}   navigate directories
+  {AMBER}pwd{RESET}                          print current directory
+  {AMBER}mkdir -p a/b/c{RESET}              create nested directories
+  {AMBER}rm <file>{RESET}                    delete file
+  {AMBER}rm -rf <dir>{RESET}                 delete folder recursively  {MAGENTA}⚠{RESET}
+  {AMBER}cp -r <src> <dst>{RESET}            copy file or folder
+  {AMBER}mv <src> <dst>{RESET}               move or rename
+  {AMBER}touch <file>{RESET}                 create empty file
+  {AMBER}cat / less / head / tail{RESET}     read file contents
+  {AMBER}tail -f <file>{RESET}               follow file live (logs)
+  {AMBER}wc -l <file>{RESET}                 count lines
+  {AMBER}diff <f1> <f2>{RESET}               compare two files
+  {AMBER}find . -name "*.py"{RESET}          find files by name pattern
+  {AMBER}find . -size +100M{RESET}           find files over 100MB
+  {AMBER}du -ah . | sort -rh | head -10{RESET}  top 10 biggest files
+  {AMBER}stat <file>{RESET}                  file metadata
+  {AMBER}file <file>{RESET}                  detect file type
+  {AMBER}ln -s <target> <link>{RESET}        create symlink
+  {AMBER}chmod +x <file>{RESET}              make executable
+  {AMBER}chmod 755 <file>{RESET}             set permissions
+  {AMBER}chown user:group <file>{RESET}      change ownership
 
-{MAGENTA}{BOLD}  AI SAFETY NET{RESET} {GREY}(runs silently on every command){RESET}
-  {GREY}────────────────────────────────────────────────────{RESET}
-  Dangerous commands     → asks {BOLD}y/N{RESET} before running
-  Typos / syntax errors  → suggests the fix, asks to run
-  Easter egg phrases     → plays the egg 🥚
+{CYAN}{BOLD}  SEARCH & TEXT PROCESSING{RESET}
+  {GREY}──────────────────────────────────────────────────────────────{RESET}
+  {AMBER}grep -rn "pattern" .{RESET}         recursive search with line numbers
+  {AMBER}grep -i "pattern" <file>{RESET}      case-insensitive search
+  {AMBER}awk '{{print $1}}' <file>{RESET}      print first column
+  {AMBER}sed 's/old/new/g' <file>{RESET}      find and replace
+  {AMBER}cut -d',' -f1 <file>{RESET}          cut by delimiter
+  {AMBER}sort -rn <file>{RESET}               reverse numeric sort
+  {AMBER}uniq <file>{RESET}                   remove duplicate lines
+  {AMBER}tr 'a-z' 'A-Z'{RESET}               transform characters
+  {AMBER}xargs{RESET}                         pipe args to command
+
+{CYAN}{BOLD}  PIPES, REDIRECTS & CHAINING{RESET}
+  {GREY}──────────────────────────────────────────────────────────────{RESET}
+  {AMBER}cmd1 | cmd2{RESET}                  pipe output to next command
+  {AMBER}cmd > file{RESET}                   redirect output (overwrite)
+  {AMBER}cmd >> file{RESET}                  append output to file
+  {AMBER}cmd 2> err.log{RESET}               redirect stderr
+  {AMBER}cmd &> all.log{RESET}               redirect stdout + stderr
+  {AMBER}cmd1 && cmd2{RESET}                 run cmd2 only if cmd1 succeeds
+  {AMBER}cmd1 || cmd2{RESET}                 run cmd2 only if cmd1 fails
+  {AMBER}cmd &{RESET}                        run in background
+  {AMBER}$(cmd){RESET}                       command substitution
+
+{CYAN}{BOLD}  PROCESSES & SYSTEM{RESET}
+  {GREY}──────────────────────────────────────────────────────────────{RESET}
+  {AMBER}ps aux --sort=-%cpu | head -10{RESET}  top CPU hogs
+  {AMBER}top{RESET}  /  {AMBER}htop{RESET}                live process monitor
+  {AMBER}kill <pid>{RESET}  /  {AMBER}killall <name>{RESET}  kill process  {MAGENTA}⚠{RESET}
+  {AMBER}jobs{RESET}  /  {AMBER}bg{RESET}  /  {AMBER}fg{RESET}          job control
+  {AMBER}nohup cmd &{RESET}                  run immune to hangup
+  {AMBER}uptime{RESET}                       uptime & load averages
+  {AMBER}uname -a{RESET}                     full system info
+  {AMBER}whoami{RESET}  /  {AMBER}who{RESET}  /  {AMBER}id{RESET}        user info
+  {AMBER}hostname{RESET}  /  {AMBER}date{RESET}  /  {AMBER}cal{RESET}    system info
+  {AMBER}env{RESET}  /  {AMBER}export VAR=val{RESET}       environment variables
+  {AMBER}history | tail -20{RESET}           last 20 commands
+  {AMBER}watch -n 2 <cmd>{RESET}             repeat command every 2s
+  {AMBER}time <cmd>{RESET}                   measure command runtime
+
+{CYAN}{BOLD}  DISK & MEMORY{RESET}
+  {GREY}──────────────────────────────────────────────────────────────{RESET}
+  {AMBER}df -h{RESET}                        disk usage
+  {AMBER}free -h{RESET}                      RAM & swap usage
+  {AMBER}lsblk{RESET}                        list block devices
+  {AMBER}du -sh <dir>{RESET}                 size of a directory
+
+{CYAN}{BOLD}  NETWORK{RESET}
+  {GREY}──────────────────────────────────────────────────────────────{RESET}
+  {AMBER}ip addr show{RESET}                 network interfaces & IPs
+  {AMBER}ss -tuln{RESET}                     open ports
+  {AMBER}ping <host>{RESET}                  ping a host
+  {AMBER}curl -O <url>{RESET}                download file
+  {AMBER}wget <url>{RESET}                   download file
+  {AMBER}ssh user@host{RESET}                SSH into remote machine
+  {AMBER}scp file user@host:/path{RESET}     copy file to remote
+  {AMBER}rsync -av src/ dst/{RESET}          sync folders
+  {AMBER}dig <domain>{RESET}                 DNS lookup
+  {AMBER}traceroute <host>{RESET}            trace network path
+
+{CYAN}{BOLD}  ARCHIVES & COMPRESSION{RESET}
+  {GREY}──────────────────────────────────────────────────────────────{RESET}
+  {AMBER}tar -czf out.tar.gz dir/{RESET}     compress to .tar.gz
+  {AMBER}tar -xzf file.tar.gz{RESET}         extract .tar.gz
+  {AMBER}zip -r out.zip dir/{RESET}           zip a folder
+  {AMBER}unzip file.zip{RESET}               extract zip
+  {AMBER}gzip / gunzip{RESET}                compress / decompress
+
+{CYAN}{BOLD}  GIT{RESET}
+  {GREY}──────────────────────────────────────────────────────────────{RESET}
+  {AMBER}git init / clone <url>{RESET}        init or clone repo
+  {AMBER}git status / diff{RESET}             check changes
+  {AMBER}git add . && git commit -m "msg"{RESET}  stage and commit
+  {AMBER}git push / pull{RESET}               sync with remote
+  {AMBER}git log --oneline{RESET}             compact history
+  {AMBER}git checkout -b <branch>{RESET}      create & switch branch
+  {AMBER}git stash{RESET}                     stash uncommitted changes
+
+{CYAN}{BOLD}  PACKAGE MANAGERS{RESET} {MAGENTA}(all ask y/N){RESET}
+  {GREY}──────────────────────────────────────────────────────────────{RESET}
+  {AMBER}apt install / remove <pkg>{RESET}    Debian/Ubuntu packages
+  {AMBER}apt update && apt upgrade{RESET}     update system           {MAGENTA}⚠{RESET}
+  {AMBER}pip install <pkg>{RESET}             Python packages
+  {AMBER}pip list / pip show <pkg>{RESET}     inspect packages
+  {AMBER}npm install <pkg>{RESET}             Node packages
+
+{CYAN}{BOLD}  SERVICES (systemctl){RESET} {MAGENTA}(ask y/N){RESET}
+  {GREY}──────────────────────────────────────────────────────────────{RESET}
+  {AMBER}systemctl status <svc>{RESET}        check service status
+  {AMBER}systemctl start/stop/restart{RESET}  control services        {MAGENTA}⚠{RESET}
+  {AMBER}systemctl enable <svc>{RESET}        enable on boot
+  {AMBER}journalctl -f{RESET}                 follow system logs
+
+{MAGENTA}{BOLD}  AI SAFETY NET{RESET} {GREY}(silent — on every command){RESET}
+  {GREY}──────────────────────────────────────────────────────────────{RESET}
+  Dangerous commands      → asks {BOLD}y/N{RESET} before running
+  Typos / syntax errors   → suggests the fix, asks y/N
+  Easter egg phrases      → plays the egg 🥚
+  Sarvam offline          → runs anyway, never blocks you
 
 {PINK}{BOLD}  CHAT MODE{RESET}
-  {GREY}────────────────────────────────────────────────────{RESET}
-  {AMBER}i wanna talk with you{RESET}     open AI chat
-  {AMBER}lets chat{RESET}                 same thing
-  {GREY}inside chat: type 'back' to return to shell{RESET}
+  {GREY}──────────────────────────────────────────────────────────────{RESET}
+  {AMBER}i wanna talk with you{RESET}  /  {AMBER}lets chat{RESET}   open AI chat
+  {GREY}  inside chat → type 'back' to return to shell{RESET}
 
-{ORANGE}{BOLD}  TTS — TEXT TO SPEECH{RESET} {GREY}(Sarvam Bulbul v3){RESET}  Status: {tts}
-  {GREY}────────────────────────────────────────────────────{RESET}
-  {AMBER}tts on{RESET}                    enable TTS globally
-  {AMBER}tts off{RESET}                   disable TTS
-  {AMBER}tts replay{RESET}                replay last chat message
-  {AMBER}tts say <text>{RESET}            speak any text aloud
-  {AMBER}tts voice <name>{RESET}          change voice (e.g. Ritu, Priya, Rahul)
-  {GREY}In chat mode: every AI reply is auto-spoken when TTS is ON{RESET}
-  {GREY}Available voices: Anushka Ritu Priya Neha Rahul Pooja{RESET}
-  {GREY}                  Rohan Simran Kavya Amit Dev Ishita{RESET}
-  {GREY}Requires: aplay (Linux) or afplay (Mac){RESET}
+{ORANGE}{BOLD}  TTS — TEXT TO SPEECH{RESET}  Status: {tts}
+  {GREY}──────────────────────────────────────────────────────────────{RESET}
+  {AMBER}tts on / tts off{RESET}             enable or disable
+  {AMBER}tts say <text>{RESET}               speak any text now
+  {AMBER}tts replay{RESET}                   replay last chat reply
+  {AMBER}tts voice <name>{RESET}             change voice
+  {AMBER}--tts{RESET}                        toggle on/off instantly
+  {GREY}  Voices: Shubh Aditya Ritu Priya Neha Rahul Pooja Rohan{RESET}
+  {GREY}          Simran Kavya Amit Dev Ishita Shreya Varun Kabir{RESET}
+  {GREY}  Falls back to pyttsx3 (offline) if Sarvam TTS unavailable{RESET}
 
-{GREEN}{BOLD}  SASHELL BUILTINS{RESET}
-  {GREY}────────────────────────────────────────────────────{RESET}
-  {AMBER}--help{RESET}  or  {AMBER}help{RESET}          this screen
-  {AMBER}--version{RESET}                 show version info
-  {AMBER}--lang=Hindi{RESET}              set AI response language at boot
-  {AMBER}lang Hindi{RESET}                change AI language while running
-  {AMBER}lang{RESET}                      show current language
-  {AMBER}fortune{RESET}                   get a terminal fortune 🔮
-  {AMBER}clear{RESET}                     clear screen
-  {AMBER}exit{RESET}  /  {AMBER}quit{RESET}            leave SaShell
+{GREEN}{BOLD}  SASHELL FLAGS & BUILTINS{RESET}
+  {GREY}──────────────────────────────────────────────────────────────{RESET}
+  {AMBER}python3 sashell.py --help{RESET}    this screen (pre-boot)
+  {AMBER}python3 sashell.py --version{RESET} version & status
+  {AMBER}python3 sashell.py --tts{RESET}     boot with TTS on
+  {AMBER}python3 sashell.py --no-ai{RESET}   pure shell, zero AI
+  {AMBER}python3 sashell.py --lang=Hindi{RESET}  AI replies in Hindi
+  {AMBER}lang Hindi{RESET}                   change AI language live
+  {AMBER}fortune{RESET}                      terminal fortune 🔮
+  {AMBER}clear{RESET}                        clear screen
+  {AMBER}exit / quit{RESET}                  leave SaShell
 
+{GREY}  ⚠  Danger commands always ask y/N. You're always in control.{RESET}
 {GREY}  🥚 Easter eggs hidden throughout. Explore.{RESET}
-{GREY}  ══════════════════════════════════════════════════════{RESET}
+{GREY}  ══════════════════════════════════════════════════════════════{RESET}
 """)
 
 def show_version():
