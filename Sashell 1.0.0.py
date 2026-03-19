@@ -12,6 +12,12 @@
 import os, sys, subprocess, random, json, re, textwrap, shutil, base64, tempfile
 import urllib.request, urllib.error
 import shutil as _shutil
+try:
+    import readline as _rl  # type: ignore
+    HAS_READLINE = True
+except ImportError:
+    _rl = None  # type: ignore
+    HAS_READLINE = False
 
 VERSION = "0.9.0"
 
@@ -19,6 +25,8 @@ VERSION = "0.9.0"
 RESET    = "\033[0m"
 BOLD     = "\033[1m"
 DIM      = "\033[2m"
+
+# These get overwritten by apply_theme() — default values here as fallback
 LIME     = "\033[38;5;154m"
 MAGENTA  = "\033[38;5;198m"
 CYAN     = "\033[38;5;51m"
@@ -30,12 +38,92 @@ GREY     = "\033[38;5;244m"
 PINK     = "\033[38;5;213m"
 ORANGE   = "\033[38;5;208m"
 
+# ── Colour themes ────────────────────────────────────────────────────────────────
+THEMES = {
+    "default": {
+        "LIME": "\033[38;5;154m", "MAGENTA": "\033[38;5;198m",
+        "CYAN": "\033[38;5;51m",  "AMBER": "\033[38;5;214m",
+        "LAVENDER": "\033[38;5;183m", "RED": "\033[38;5;196m",
+        "GREEN": "\033[38;5;82m", "GREY": "\033[38;5;244m",
+        "PINK": "\033[38;5;213m", "ORANGE": "\033[38;5;208m",
+    },
+    "red": {
+        "LIME": "\033[38;5;196m", "MAGENTA": "\033[38;5;160m",
+        "CYAN": "\033[38;5;203m", "AMBER": "\033[38;5;208m",
+        "LAVENDER": "\033[38;5;204m", "RED": "\033[38;5;196m",
+        "GREEN": "\033[38;5;202m", "GREY": "\033[38;5;244m",
+        "PINK": "\033[38;5;197m", "ORANGE": "\033[38;5;202m",
+    },
+    "blue": {
+        "LIME": "\033[38;5;39m",  "MAGENTA": "\033[38;5;63m",
+        "CYAN": "\033[38;5;45m",  "AMBER": "\033[38;5;75m",
+        "LAVENDER": "\033[38;5;111m", "RED": "\033[38;5;196m",
+        "GREEN": "\033[38;5;33m", "GREY": "\033[38;5;244m",
+        "PINK": "\033[38;5;69m",  "ORANGE": "\033[38;5;67m",
+    },
+    "pink": {
+        "LIME": "\033[38;5;213m", "MAGENTA": "\033[38;5;207m",
+        "CYAN": "\033[38;5;218m", "AMBER": "\033[38;5;219m",
+        "LAVENDER": "\033[38;5;183m", "RED": "\033[38;5;196m",
+        "GREEN": "\033[38;5;212m", "GREY": "\033[38;5;244m",
+        "PINK": "\033[38;5;205m", "ORANGE": "\033[38;5;211m",
+    },
+    "gold": {
+        "LIME": "\033[38;5;220m", "MAGENTA": "\033[38;5;214m",
+        "CYAN": "\033[38;5;228m", "AMBER": "\033[38;5;226m",
+        "LAVENDER": "\033[38;5;222m", "RED": "\033[38;5;196m",
+        "GREEN": "\033[38;5;184m", "GREY": "\033[38;5;244m",
+        "PINK": "\033[38;5;221m", "ORANGE": "\033[38;5;214m",
+    },
+    "purple": {
+        "LIME": "\033[38;5;141m", "MAGENTA": "\033[38;5;135m",
+        "CYAN": "\033[38;5;183m", "AMBER": "\033[38;5;147m",
+        "LAVENDER": "\033[38;5;189m", "RED": "\033[38;5;196m",
+        "GREEN": "\033[38;5;135m", "GREY": "\033[38;5;244m",
+        "PINK": "\033[38;5;177m", "ORANGE": "\033[38;5;141m",
+    },
+    "matrix": {
+        "LIME": "\033[38;5;46m",  "MAGENTA": "\033[38;5;34m",
+        "CYAN": "\033[38;5;40m",  "AMBER": "\033[38;5;82m",
+        "LAVENDER": "\033[38;5;28m", "RED": "\033[38;5;196m",
+        "GREEN": "\033[38;5;46m", "GREY": "\033[38;5;22m",
+        "PINK": "\033[38;5;34m",  "ORANGE": "\033[38;5;40m",
+    },
+    "ocean": {
+        "LIME": "\033[38;5;87m",  "MAGENTA": "\033[38;5;51m",
+        "CYAN": "\033[38;5;123m", "AMBER": "\033[38;5;159m",
+        "LAVENDER": "\033[38;5;117m", "RED": "\033[38;5;196m",
+        "GREEN": "\033[38;5;49m", "GREY": "\033[38;5;244m",
+        "PINK": "\033[38;5;122m", "ORANGE": "\033[38;5;86m",
+    },
+}
+
+def apply_theme(name: str):
+    """Apply a colour theme globally."""
+    global LIME, MAGENTA, CYAN, AMBER, LAVENDER, RED, GREEN, GREY, PINK, ORANGE, COLOUR_THEME
+    t = THEMES.get(name.lower())
+    if not t:
+        available = ", ".join(THEMES.keys())
+        print(f"{RED}  Unknown theme: {name}{RESET}")
+        print(f"{GREY}  Available: {available}{RESET}\n")
+        return
+    LIME, MAGENTA, CYAN = t["LIME"], t["MAGENTA"], t["CYAN"]
+    AMBER, LAVENDER     = t["AMBER"], t["LAVENDER"]
+    RED, GREEN, GREY    = t["RED"], t["GREEN"], t["GREY"]
+    PINK, ORANGE        = t["PINK"], t["ORANGE"]
+    COLOUR_THEME        = name.lower()
+    print(f"\n  {LIME}Theme set to: {BOLD}{name}{RESET}\n")
+
+# Apply default theme on import
+apply_theme("default")
+
 # ── Global state ─────────────────────────────────────────────────────────────────
 SARVAM_API_KEY = "sk_v13x3ob5_TslaNd4aDKiufotX6jVHezQA"  # TODO: remove before push
 TTS_ENABLED    = False          # toggled by --tts flag or `tts on/off` at runtime
-TTS_VOICE      = "Shubh"        # default voice for bulbul:v3
+TTS_VOICE      = "anushka"      # default voice for bulbul:v3
 LAST_MESSAGE   = ""             # last AI chat reply, for --tts replay
 SHELL_LANG     = "English"        # preferred language for AI responses
+COLOUR_THEME   = "default"        # current colour theme name
 
 # ── Boot / fortune ───────────────────────────────────────────────────────────────
 BOOT_MESSAGES = [
@@ -56,10 +144,6 @@ FORTUNES = [
     "Have you tried turning it off and on again? Seriously.",
     "Your longest function is also your biggest regret.",
     "chmod 777 is not a solution. It's a cry for help.",
-    "The bug you are looking for is in the last place you look.",
-    "A rubber duck is your best debugging partner. Talk to it more.",
-    "The code you write while tired will be the code you debug while sober.",
-    "This is too much for you to handle, go touch some grass.",
 ]
 
 # ── Easter eggs ──────────────────────────────────────────────────────────────────
@@ -217,7 +301,7 @@ def speak(text):
     payload = json.dumps({
         "inputs": [clean],
         "target_language_code": "en-IN",
-        "speaker": TTS_VOICE,
+        "speaker": TTS_VOICE.lower(),
         "model": "bulbul:v3",
         "speech_sample_rate": 22050,
         "enable_preprocessing": True,
@@ -240,7 +324,7 @@ def speak(text):
         except urllib.error.HTTPError as http_err:
             clear_line()
             # 403 / auth error → silently fall back to pyttsx3
-            if http_err.code in (403, 401):
+            if http_err.code in (400, 401, 403):
                 print(f"{AMBER}  🔊 Sarvam TTS unavailable — using offline voice.{RESET}")
                 _speak_pyttsx3(clean)
             else:
@@ -299,6 +383,48 @@ def get_api_key():
             print(f"{AMBER}  Key can't be empty. Try again.{RESET}")
     print(f"{GREEN}  ✓ Key accepted.{RESET}\n")
     return key
+
+# ── Auto-suggest (ghost text) ────────────────────────────────────────────────────
+# We store the last accepted ghost suggestion here
+_ghost_text = ""
+
+class AutoSuggestCompleter:
+    """
+    readline completer that shows dim ghost text matching history.
+    On TAB it accepts the suggestion.
+    """
+    def __init__(self):
+        self.matches = []
+
+    def complete(self, text, state):
+        if state == 0:
+            self.matches = []
+            if text and HAS_READLINE:
+                n = _rl.get_current_history_length()  # type: ignore[union-attr]
+                seen = set()
+                for i in range(n, 0, -1):
+                    item = _rl.get_history_item(i) or ""  # type: ignore[union-attr]
+                    if item.startswith(text) and item != text and item not in seen:
+                        self.matches.append(item)
+                        seen.add(item)
+        try:
+            return self.matches[state]
+        except IndexError:
+            return None
+
+def setup_readline():
+    """Configure readline with history search (Ctrl+R) and tab-complete."""
+    if not HAS_READLINE:
+        return
+    try:
+        _rl.set_completer(AutoSuggestCompleter().complete)  # type: ignore[union-attr]
+        _rl.parse_and_bind("tab: complete")                 # type: ignore[union-attr]
+        _rl.parse_and_bind(r'"\C-r": reverse-search-history')  # type: ignore[union-attr]
+        _rl.parse_and_bind(r'"\C-s": forward-search-history')  # type: ignore[union-attr]
+        _rl.parse_and_bind("set show-all-if-ambiguous on")       # type: ignore[union-attr]
+        _rl.parse_and_bind("set completion-ignore-case on")      # type: ignore[union-attr]
+    except Exception:
+        pass
 
 # ── UI helpers ───────────────────────────────────────────────────────────────────
 ASCII_LOGO = [
@@ -557,7 +683,11 @@ def show_help():
   {AMBER}python3 sashell.py --tts{RESET}     boot with TTS on
   {AMBER}python3 sashell.py --no-ai{RESET}   pure shell, zero AI
   {AMBER}python3 sashell.py --lang=Hindi{RESET}  AI replies in Hindi
+  {AMBER}python3 sashell.py --colour=matrix{RESET}  start with a colour theme
   {AMBER}lang Hindi{RESET}                   change AI language live
+  {AMBER}theme matrix{RESET}                 switch colour theme
+  {AMBER}colour red{RESET}  /  {AMBER}color blue{RESET}     same as theme
+  {GREY}  Themes: default red blue pink gold purple matrix ocean{RESET}
   {AMBER}fortune{RESET}                      terminal fortune 🔮
   {AMBER}clear{RESET}                        clear screen
   {AMBER}exit / quit{RESET}                  leave SaShell
@@ -575,6 +705,7 @@ def show_version():
   TTS:     {CYAN}bulbul:v3{RESET}  ({TTS_VOICE})
   TTS on:  {GREEN if TTS_ENABLED else GREY}{TTS_ENABLED}{RESET}
   Lang:    {CYAN}{SHELL_LANG}{RESET}
+  Theme:   {CYAN}{COLOUR_THEME}{RESET}
   Python:  {CYAN}{sys.version.split()[0]}{RESET}
   Key set: {GREEN}yes{RESET if SARVAM_API_KEY else RED + "no" + RESET}
 """)
@@ -688,7 +819,7 @@ def do_cd(args):
 
 # ── Main loop ────────────────────────────────────────────────────────────────────
 def main():
-    global SARVAM_API_KEY, TTS_ENABLED, SHELL_LANG
+    global SARVAM_API_KEY, TTS_ENABLED, SHELL_LANG, COLOUR_THEME
 
     # ── parse CLI args ──
     args = sys.argv[1:]
@@ -698,6 +829,8 @@ def main():
     for a in args:
         if a.startswith("--lang="):
             SHELL_LANG = a.split("=", 1)[1].strip()
+        if a.startswith("--colour=") or a.startswith("--color="):
+            apply_theme(a.split("=", 1)[1].strip())
     if "--version" in args:
         # print version without full boot
         print(f"SaShell v{VERSION}")
@@ -709,6 +842,7 @@ def main():
         sys.exit(0)
 
     banner()
+    setup_readline()
 
     if no_ai:
         print(f"{AMBER}  ⚡ Running in --no-ai mode. Pure shell, no Sarvam.{RESET}\n")
@@ -756,6 +890,17 @@ def main():
             else:
                 print(f"\n  {CYAN}Current AI language: {BOLD}{SHELL_LANG}{RESET}")
                 print(f"  {GREY}Usage: lang Hindi  /  lang Tamil  /  lang English{RESET}\n")
+            continue
+
+        # ── Theme / colour control ───────────────────────────────────────
+        if tokens[0].lower() in ("theme", "colour", "color"):
+            if len(tokens) > 1:
+                apply_theme(tokens[1])
+            else:
+                available = ", ".join(THEMES.keys())
+                print(f"\n  {CYAN}Current theme: {BOLD}{COLOUR_THEME}{RESET}")
+                print(f"  {GREY}Available: {available}{RESET}")
+                print(f"  {GREY}Usage: theme matrix  /  colour red  /  color ocean{RESET}\n")
             continue
 
         # ── TTS controls ──────────────────────────────────────────────────
