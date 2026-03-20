@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SaShell — Real Linux Shell with Sarvam AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --lime:     #9deb3b;
+  --cyan:     #00eeff;
+  --magenta:  #ff2d78;
+  --amber:    #ffb700;
+  --lavender: #c4a3ff;
+  --bg:       #070909;
+  --bg2:      #0d1117;
+  --bg3:      #131920;
+  --border:   #1a2332;
+  --text:     #b8c8d8;
+  --dim:      #445566;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Syne', sans-serif;
+  font-size: 15px;
+  line-height: 1.75;
+  cursor: none;
+}
+
+/* ── Custom cursor ── */
+.cursor {
+  width: 8px; height: 18px;
+  background: var(--lime);
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  mix-blend-mode: screen;
+  transition: transform 0.08s ease;
+  animation: blink 1s step-end infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* ── Scanline overlay ── */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 2px,
+    rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px
+  );
+  pointer-events: none;
+  z-index: 9998;
+}
+
+/* ── Nav ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0;
+  z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 48px;
+  background: rgba(7,9,9,0.85);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+.nav-logo {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 18px;
+  color: var(--lime);
+  text-decoration: none;
+  text-shadow: 0 0 12px rgba(157,235,59,0.5);
+}
+.nav-links { display: flex; gap: 32px; list-style: none; }
+.nav-links a {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--dim);
+  text-decoration: none;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--cyan); }
+
+/* ── Hero ── */
+.hero {
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 120px 48px 80px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* animated grid bg */
+.hero-grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(157,235,59,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(157,235,59,0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  animation: grid-scroll 20s linear infinite;
+}
+@keyframes grid-scroll { to { background-position: 0 48px; } }
+
+/* radial glow */
+.hero::before {
+  content: '';
+  position: absolute;
+  width: 600px; height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(157,235,59,0.07) 0%, transparent 70%);
+  top: 50%; left: 50%;
+  transform: translate(-50%, -60%);
+  pointer-events: none;
+}
+
+.ascii-wrap {
+  position: relative;
+  margin-bottom: 32px;
+}
+.ascii-logo {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: clamp(7px, 1.3vw, 14px);
+  line-height: 1.2;
+  white-space: pre;
+  display: block;
+  background: linear-gradient(90deg,
+    var(--lime) 0%,
+    var(--cyan) 40%,
+    var(--magenta) 75%,
+    var(--lime) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: logo-shift 4s linear infinite;
+  filter: drop-shadow(0 0 18px rgba(157,235,59,0.35));
+}
+@keyframes logo-shift { to { background-position: -200% 0; } }
+
+.hero-tagline {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: clamp(13px, 1.5vw, 15px);
+  color: var(--cyan);
+  letter-spacing: 0.06em;
+  margin-bottom: 12px;
+  opacity: 0; animation: fadein 0.6s 0.4s forwards;
+}
+.hero-sub {
+  font-size: 16px;
+  color: var(--dim);
+  max-width: 520px;
+  text-align: center;
+  margin-bottom: 40px;
+  opacity: 0; animation: fadein 0.6s 0.7s forwards;
+}
+@keyframes fadein { to { opacity: 1; } }
+
+.hero-ctas {
+  display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
+  opacity: 0; animation: fadein 0.6s 1s forwards;
+}
+.btn {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  padding: 12px 28px;
+  border-radius: 4px;
+  text-decoration: none;
+  letter-spacing: 0.08em;
+  transition: all 0.2s;
+  cursor: none;
+}
+.btn-primary {
+  background: var(--lime);
+  color: #070909;
+  border: 1px solid var(--lime);
+}
+.btn-primary:hover {
+  background: transparent;
+  color: var(--lime);
+  box-shadow: 0 0 20px rgba(157,235,59,0.3);
+}
+.btn-secondary {
+  background: transparent;
+  color: var(--cyan);
+  border: 1px solid var(--cyan);
+}
+.btn-secondary:hover {
+  background: rgba(0,238,255,0.08);
+  box-shadow: 0 0 20px rgba(0,238,255,0.2);
+}
+
+.badges {
+  display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+  margin-top: 48px;
+  opacity: 0; animation: fadein 0.6s 1.3s forwards;
+}
+.badge {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 3px;
+  border: 1px solid;
+  letter-spacing: 0.06em;
+}
+.bl { color: var(--lime);    border-color: rgba(157,235,59,0.4);    background: rgba(157,235,59,0.06); }
+.bc { color: var(--cyan);    border-color: rgba(0,238,255,0.4);    background: rgba(0,238,255,0.06); }
+.bm { color: var(--magenta); border-color: rgba(255,45,120,0.4);   background: rgba(255,45,120,0.06); }
+.ba { color: var(--amber);   border-color: rgba(255,183,0,0.4);    background: rgba(255,183,0,0.06); }
+
+/* ── Terminal demo ── */
+.terminal-wrap {
+  width: 100%; max-width: 700px;
+  margin: 56px auto 0;
+  opacity: 0; animation: fadein 0.6s 1.5s forwards;
+}
+.terminal {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(157,235,59,0.08);
+}
+.terminal-bar {
+  background: var(--bg3);
+  padding: 10px 16px;
+  display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.dot { width: 12px; height: 12px; border-radius: 50%; }
+.dot-r { background: #ff5f57; }
+.dot-y { background: #febc2e; }
+.dot-g { background: #28c840; }
+.terminal-title {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--dim);
+  margin-left: auto; margin-right: auto;
+}
+.terminal-body {
+  padding: 24px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  line-height: 1.8;
+  min-height: 240px;
+}
+.t-prompt { color: var(--lavender); }
+.t-cmd    { color: var(--amber); }
+.t-out    { color: var(--text); }
+.t-ok     { color: var(--lime); }
+.t-warn   { color: var(--magenta); }
+.t-dim    { color: var(--dim); }
+.t-cyan   { color: var(--cyan); }
+#typed-cmd { color: var(--amber); }
+.cursor-inline {
+  display: inline-block;
+  width: 8px; height: 14px;
+  background: var(--lime);
+  vertical-align: middle;
+  animation: blink 1s step-end infinite;
+}
+
+/* ── Section base ── */
+section { padding: 100px 48px; max-width: 1100px; margin: 0 auto; }
+.section-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--lime);
+  margin-bottom: 12px;
+}
+.section-title {
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 800;
+  line-height: 1.1;
+  color: #e8f0f8;
+  margin-bottom: 16px;
+}
+.section-desc {
+  color: var(--dim);
+  font-size: 16px;
+  max-width: 560px;
+  margin-bottom: 56px;
+}
+
+/* ── Features ── */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+.feature-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 28px;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+.feature-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.feature-card:hover { border-color: rgba(157,235,59,0.3); box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+.feature-card:hover::before { opacity: 1; }
+.fc-lime::before   { background: linear-gradient(90deg, var(--lime), transparent); }
+.fc-cyan::before   { background: linear-gradient(90deg, var(--cyan), transparent); }
+.fc-magenta::before{ background: linear-gradient(90deg, var(--magenta), transparent); }
+.fc-amber::before  { background: linear-gradient(90deg, var(--amber), transparent); }
+.fc-lavender::before{ background: linear-gradient(90deg, var(--lavender), transparent); }
+.feature-icon { font-size: 28px; margin-bottom: 16px; }
+.feature-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #e8f0f8;
+  margin-bottom: 8px;
+}
+.feature-desc { font-size: 14px; color: var(--dim); line-height: 1.7; }
+.feature-tags { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 6px; }
+.ftag {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 2px;
+  background: rgba(157,235,59,0.08);
+  color: var(--lime);
+  border: 1px solid rgba(157,235,59,0.2);
+}
+.ftag.c { background: rgba(0,238,255,0.08); color: var(--cyan); border-color: rgba(0,238,255,0.2); }
+.ftag.m { background: rgba(255,45,120,0.08); color: var(--magenta); border-color: rgba(255,45,120,0.2); }
+.ftag.a { background: rgba(255,183,0,0.08); color: var(--amber); border-color: rgba(255,183,0,0.2); }
+
+/* ── Install ── */
+.install-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+@media(max-width:720px){ .install-grid { grid-template-columns: 1fr; } }
+.install-step {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 28px;
+}
+.step-num {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--lime);
+  letter-spacing: 0.1em;
+  margin-bottom: 10px;
+}
+.step-title { font-size: 17px; font-weight: 700; color: #e8f0f8; margin-bottom: 16px; }
+pre {
+  background: #060808;
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--cyan);
+  border-radius: 6px;
+  padding: 16px 20px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12.5px;
+  color: var(--cyan);
+  overflow-x: auto;
+  line-height: 1.7;
+}
+pre .c { color: var(--dim); }
+pre .l { color: var(--lime); }
+pre .a { color: var(--amber); }
+
+.flags-table { width: 100%; margin-top: 32px; border-collapse: collapse; }
+.flags-table th {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--dim);
+  text-align: left;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.flags-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(26,35,50,0.6);
+  font-size: 14px;
+}
+.flags-table td:first-child {
+  font-family: 'Share Tech Mono', monospace;
+  color: var(--amber);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.flags-table tr:hover td { background: rgba(157,235,59,0.02); }
+
+/* ── Commands ── */
+.cmd-tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 28px; }
+.tab-btn {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  padding: 7px 16px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--dim);
+  cursor: none;
+  letter-spacing: 0.08em;
+  transition: all 0.2s;
+}
+.tab-btn:hover, .tab-btn.active {
+  color: var(--lime);
+  border-color: rgba(157,235,59,0.4);
+  background: rgba(157,235,59,0.06);
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+.cmd-table { width: 100%; border-collapse: collapse; }
+.cmd-table th {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--dim);
+  text-align: left;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.cmd-table td {
+  padding: 11px 16px;
+  border-bottom: 1px solid rgba(26,35,50,0.5);
+  font-size: 13.5px;
+}
+.cmd-table td:first-child {
+  font-family: 'Share Tech Mono', monospace;
+  color: var(--amber);
+  font-size: 12.5px;
+  width: 40%;
+}
+.cmd-table tr:hover td { background: rgba(157,235,59,0.02); }
+.warn { color: var(--magenta); font-size: 11px; margin-left: 4px; }
+
+/* ── Easter eggs ── */
+.eggs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.egg-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px 20px;
+  display: flex; align-items: flex-start; gap: 14px;
+  transition: border-color 0.25s, transform 0.25s;
+  cursor: none;
+}
+.egg-card:hover {
+  border-color: rgba(196,163,255,0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.egg-icon { font-size: 22px; flex-shrink: 0; margin-top: 2px; }
+.egg-phrase {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12.5px;
+  color: var(--amber);
+  margin-bottom: 4px;
+}
+.egg-hint { font-size: 13px; color: var(--dim); }
+.egg-mystery {
+  text-align: center;
+  padding: 32px;
+  background: var(--bg2);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  margin-top: 14px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+/* ── About ── */
+.about-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start; }
+@media(max-width:720px){ .about-grid { grid-template-columns: 1fr; } }
+.about-block { }
+.about-block h3 {
+  font-size: 18px; font-weight: 700;
+  color: #e8f0f8; margin-bottom: 12px;
+}
+.about-block p { color: var(--dim); font-size: 14px; margin-bottom: 12px; }
+.stack-list { list-style: none; }
+.stack-list li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between;
+  font-size: 14px;
+}
+.stack-list li:last-child { border-bottom: none; }
+.stack-key { color: var(--text); }
+.stack-val { font-family: 'Share Tech Mono', monospace; color: var(--cyan); font-size: 12.5px; }
+
+/* ── Footer ── */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 40px 48px;
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 16px;
+}
+.footer-logo {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 16px;
+  color: var(--lime);
+  text-shadow: 0 0 10px rgba(157,235,59,0.4);
+}
+.footer-text {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--dim);
+}
+.footer-text span { color: var(--lime); }
+
+/* ── Divider ── */
+.divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+  margin: 0 48px;
+}
+
+/* ── Scroll reveal ── */
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+
+<!-- ── NAV ── -->
+<nav>
+  <a class="nav-logo" href="#">sash</a>
+  <ul class="nav-links">
+    <li><a href="#features">Features</a></li>
+    <li><a href="#install">Install</a></li>
+    <li><a href="#commands">Commands</a></li>
+    <li><a href="#eggs">Easter Eggs</a></li>
+    <li><a href="#about">About</a></li>
+  </ul>
+</nav>
+
+<!-- ── HERO ── -->
+<div class="hero">
+  <div class="hero-grid"></div>
+
+  <div class="ascii-wrap">
+    <span class="ascii-logo"> ██████╗ █████╗  ██████╗██╗  ██╗███████╗██╗     ██╗
+██╔════╝██╔══██╗██╔════╝██║  ██║██╔════╝██║     ██║
+╚█████╗ ███████║╚█████╗ ███████║█████╗  ██║     ██║
+ ╚═══██╗██╔══██║ ╚═══██╗██╔══██║██╔══╝  ██║     ██║
+██████╔╝██║  ██║██████╔╝██║  ██║███████╗███████╗███████╗
+╚═════╝ ╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚══════╝╚══════╝╚══════╝</span>
+  </div>
+
+  <p class="hero-tagline">v0.9.0 — Real Linux Shell · Sarvam AI Safety Net</p>
+  <p class="hero-sub">Type real commands. AI watches silently — stepping in only when something looks dangerous, broken, or funny.</p>
+
+  <div class="hero-ctas">
+    <a class="btn btn-primary" href="#install">Get Started</a>
+    <a class="btn btn-secondary" href="#commands">Command Ref</a>
+  </div>
+
+  <div class="badges">
+    <span class="badge bl">v0.9.0</span>
+    <span class="badge bc">Python 3</span>
+    <span class="badge ba">sarvam-m</span>
+    <span class="badge bm">bulbul:v3 TTS</span>
+    <span class="badge bl">Linux / macOS</span>
+  </div>
+
+  <!-- Terminal demo -->
+  <div class="terminal-wrap">
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="dot dot-r"></div>
+        <div class="dot dot-y"></div>
+        <div class="dot dot-g"></div>
+        <span class="terminal-title">sashell — python3 sashell.py</span>
+      </div>
+      <div class="terminal-body" id="terminal-demo">
+        <div><span class="t-prompt">┌─[sash]─[~]</span></div>
+        <div><span class="t-prompt">└─▶ </span><span id="typed-cmd"></span><span class="cursor-inline"></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ── FEATURES ── -->
+<section id="features">
+  <div class="reveal">
+    <div class="section-label">// capabilities</div>
+    <h2 class="section-title">Everything a shell should be.<br>Plus a brain.</h2>
+    <p class="section-desc">SaShell runs real Linux commands natively. The AI is just a silent observer — not a translator.</p>
+  </div>
+
+  <div class="features-grid reveal">
+    <div class="feature-card fc-lime">
+      <div class="feature-icon">🐚</div>
+      <div class="feature-title">Real Linux Shell</div>
+      <div class="feature-desc">Every command runs directly through bash — pipes, redirects, background jobs, wildcards, scripts. No translation layer.</div>
+      <div class="feature-tags">
+        <span class="ftag">subprocess</span>
+        <span class="ftag">shell=True</span>
+        <span class="ftag c">native bash</span>
+      </div>
+    </div>
+    <div class="feature-card fc-magenta">
+      <div class="feature-icon">🛡️</div>
+      <div class="feature-title">AI Safety Net</div>
+      <div class="feature-desc">sarvam-m silently judges every command. Dangerous ones ask y/N. Typos get corrected. Easter eggs get played.</div>
+      <div class="feature-tags">
+        <span class="ftag m">DANGEROUS</span>
+        <span class="ftag a">TYPO</span>
+        <span class="ftag">EASTER_EGG</span>
+      </div>
+    </div>
+    <div class="feature-card fc-cyan">
+      <div class="feature-icon">💬</div>
+      <div class="feature-title">Chat Mode</div>
+      <div class="feature-desc">Say "i wanna talk with you" to open a full AI conversation with session memory. Type back to return to shell.</div>
+      <div class="feature-tags">
+        <span class="ftag c">session memory</span>
+        <span class="ftag c">multi-turn</span>
+      </div>
+    </div>
+    <div class="feature-card fc-amber">
+      <div class="feature-icon">🔊</div>
+      <div class="feature-title">Text to Speech</div>
+      <div class="feature-desc">Sarvam Bulbul v3 voices read out chat replies, custom text, or anything you want spoken. Falls back to pyttsx3 offline.</div>
+      <div class="feature-tags">
+        <span class="ftag a">bulbul:v3</span>
+        <span class="ftag a">16 voices</span>
+        <span class="ftag">pyttsx3 fallback</span>
+      </div>
+    </div>
+    <div class="feature-card fc-lavender">
+      <div class="feature-icon">🌐</div>
+      <div class="feature-title">Indian Language Support</div>
+      <div class="feature-desc">AI responds in Hindi, Tamil, Telugu, Kannada, Bengali and more. Set at boot or switch live with the lang command.</div>
+      <div class="feature-tags">
+        <span class="ftag">--lang=Hindi</span>
+        <span class="ftag">lang Tamil</span>
+      </div>
+    </div>
+    <div class="feature-card fc-lime">
+      <div class="feature-icon">🥚</div>
+      <div class="feature-title">30+ Easter Eggs</div>
+      <div class="feature-desc">Hidden responses scattered throughout. From classic memes to terminal philosophy. The shell has personality.</div>
+      <div class="feature-tags">
+        <span class="ftag">explore</span>
+        <span class="ftag c">hidden</span>
+        <span class="ftag m">chaotic</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ── INSTALL ── -->
+<section id="install">
+  <div class="reveal">
+    <div class="section-label">// quickstart</div>
+    <h2 class="section-title">Up in 30 seconds.</h2>
+    <p class="section-desc">No frameworks. No build step. Pure Python stdlib — just one optional pip install for offline TTS.</p>
+  </div>
+
+  <div class="install-grid reveal">
+    <div class="install-step">
+      <div class="step-num">STEP 01</div>
+      <div class="step-title">Install & Run</div>
+<pre><span class="c"># optional: offline TTS fallback</span>
+<span class="l">pip install pyttsx3</span>
+
+<span class="c"># run SaShell</span>
+<span class="l">python3 sashell.py</span></pre>
+      <p style="margin-top:16px;font-size:13px;color:var(--dim)">Get a free API key at <span style="color:var(--cyan)">dashboard.sarvam.ai</span></p>
+    </div>
+    <div class="install-step">
+      <div class="step-num">STEP 02</div>
+      <div class="step-title">Startup Flags</div>
+<pre><span class="c"># boot with TTS on</span>
+<span class="l">python3 sashell.py --tts</span>
+
+<span class="c"># respond in Tamil</span>
+<span class="l">python3 sashell.py --lang=Tamil</span>
+
+<span class="c"># zero AI, pure shell</span>
+<span class="l">python3 sashell.py --no-ai</span>
+
+<span class="c"># full command reference</span>
+<span class="l">python3 sashell.py --help</span></pre>
+    </div>
+  </div>
+
+  <div class="reveal" style="margin-top:32px">
+    <table class="flags-table">
+      <thead><tr><th>Flag</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>--help</td><td>Show full command reference and exit</td></tr>
+        <tr><td>--version</td><td>Show version, model, TTS and language status</td></tr>
+        <tr><td>--tts</td><td>Boot with text-to-speech already enabled</td></tr>
+        <tr><td>--no-ai</td><td>Pure shell — zero Sarvam API calls</td></tr>
+        <tr><td>--lang=X</td><td>Set AI response language from boot (Hindi, Tamil, etc.)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ── COMMANDS ── -->
+<section id="commands">
+  <div class="reveal">
+    <div class="section-label">// reference</div>
+    <h2 class="section-title">Every command.<br>Right here.</h2>
+    <p class="section-desc">SaShell supports all Linux commands natively. Below is a curated reference.</p>
+  </div>
+
+  <div class="reveal">
+    <div class="cmd-tabs">
+      <button class="tab-btn active" onclick="showTab('files')">Files</button>
+      <button class="tab-btn" onclick="showTab('search')">Search</button>
+      <button class="tab-btn" onclick="showTab('pipes')">Pipes</button>
+      <button class="tab-btn" onclick="showTab('process')">Processes</button>
+      <button class="tab-btn" onclick="showTab('network')">Network</button>
+      <button class="tab-btn" onclick="showTab('git')">Git</button>
+      <button class="tab-btn" onclick="showTab('packages')">Packages</button>
+      <button class="tab-btn" onclick="showTab('tts')">TTS</button>
+      <button class="tab-btn" onclick="showTab('sashell')">SaShell</button>
+    </div>
+
+    <div id="tab-files" class="tab-panel active">
+      <table class="cmd-table"><thead><tr><th>Command</th><th>Description</th></tr></thead><tbody>
+        <tr><td>ls -la</td><td>List all files including hidden, with details</td></tr>
+        <tr><td>cd &lt;dir&gt; / cd .. / cd ~</td><td>Navigate directories</td></tr>
+        <tr><td>pwd</td><td>Print current directory</td></tr>
+        <tr><td>mkdir -p a/b/c</td><td>Create nested directories</td></tr>
+        <tr><td>rm -rf &lt;dir&gt;</td><td>Delete folder recursively <span class="warn">⚠ asks y/N</span></td></tr>
+        <tr><td>cp -r &lt;src&gt; &lt;dst&gt;</td><td>Copy file or folder</td></tr>
+        <tr><td>mv &lt;src&gt; &lt;dst&gt;</td><td>Move or rename</td></tr>
+        <tr><td>find . -name "*.py"</td><td>Find files by name pattern</td></tr>
+        <tr><td>find . -size +100M</td><td>Find files over 100MB</td></tr>
+        <tr><td>du -ah . | sort -rh | head -10</td><td>Top 10 biggest files</td></tr>
+        <tr><td>chmod +x &lt;file&gt;</td><td>Make executable</td></tr>
+        <tr><td>tail -f &lt;file&gt;</td><td>Follow file live (great for logs)</td></tr>
+        <tr><td>diff &lt;f1&gt; &lt;f2&gt;</td><td>Compare two files</td></tr>
+        <tr><td>ln -s &lt;target&gt; &lt;link&gt;</td><td>Create symlink</td></tr>
+      </tbody></table>
+    </div>
+
+    <div id="tab-search" class="tab-panel">
+      <table class="cmd-table"><thead><tr><th>Command</th><th>Description</th></tr></thead><tbody>
+        <tr><td>grep -rn "pattern" .</td><td>Recursive search with line numbers</td></tr>
+        <tr><td>grep -i "pattern" &lt;file&gt;</td><td>Case-insensitive search</td></tr>
+        <tr><td>awk '{print $1}' &lt;file&gt;</td><td>Print first column</td></tr>
+        <tr><td>sed 's/old/new/g' &lt;file&gt;</td><td>Find and replace</td></tr>
+        <tr><td>sort -rn &lt;file&gt;</td><td>Reverse numeric sort</td></tr>
+        <tr><td>uniq &lt;file&gt;</td><td>Remove duplicate lines</td></tr>
+        <tr><td>wc -l &lt;file&gt;</td><td>Count lines</td></tr>
+        <tr><td>cut -d',' -f1 &lt;file&gt;</td><td>Cut by delimiter</td></tr>
+        <tr><td>tr 'a-z' 'A-Z'</td><td>Transform characters</td></tr>
+      </tbody></table>
+    </div>
+
+    <div id="tab-pipes" class="tab-panel">
+      <table class="cmd-table"><thead><tr><th>Syntax</th><th>Description</th></tr></thead><tbody>
+        <tr><td>cmd1 | cmd2</td><td>Pipe output to next command</td></tr>
+        <tr><td>cmd &gt; file</td><td>Redirect output (overwrite)</td></tr>
+        <tr><td>cmd &gt;&gt; file</td><td>Append output to file</td></tr>
+        <tr><td>cmd 2&gt; err.log</td><td>Redirect stderr</td></tr>
+        <tr><td>cmd &amp;&gt; all.log</td><td>Redirect stdout + stderr</td></tr>
+        <tr><td>cmd1 &amp;&amp; cmd2</td><td>Run cmd2 only if cmd1 succeeds</td></tr>
+        <tr><td>cmd1 || cmd2</td><td>Run cmd2 only if cmd1 fails</td></tr>
+        <tr><td>cmd &amp;</td><td>Run in background</td></tr>
+        <tr><td>$(cmd)</td><td>Command substitution</td></tr>
+      </tbody></table>
+    </div>
+
+    <div id="tab-process" class="tab-panel">
+      <table class="cmd-table"><thead><tr><th>Command</th><th>Description</th></tr></thead><tbody>
+        <tr><td>ps aux --sort=-%cpu</td><td>All processes sorted by CPU</td></tr>
+        <tr><td>top / htop</td><td>Live process monitor</td></tr>
+        <tr><td>kill &lt;pid&gt; / killall &lt;n&gt;</td><td>Kill process <span class="warn">⚠ asks y/N</span></td></tr>
+        <tr><td>uptime</td><td>Uptime and load averages</td></tr>
+        <tr><td>uname -a</td><td>Full system info</td></tr>
+        <tr><td>free -h</td><td>RAM and swap usage</td></tr>
+        <tr><td>df -h</td><td>Disk usage</td></tr>
+        <tr><td>watch -n 2 &lt;cmd&gt;</td><td>Repeat command every 2 seconds</td></tr>
+        <tr><td>env / export VAR=val</td><td>Environment variables</td></tr>
+      </tbody></table>
+    </div>
+
+    <div id="tab-network" class="tab-panel">
+      <table class="cmd-table"><thead><tr><th>Command</th><th>Description</th></tr></thead><tbody>
+        <tr><td>ip addr show</td><td>Network interfaces and IPs</td></tr>
+        <tr><td>ss -tuln</td><td>Open ports</td></tr>
+        <tr><td>ping &lt;host&gt;</td><td>Ping a host</td></tr>
+        <tr><td>curl -O &lt;url&gt;</td><td>Download a file</td></tr>
+        <tr><td>wget &lt;url&gt;</td><td>Download a file</td></tr>
+        <tr><td>ssh user@host</td><td>SSH into remote machine</td></tr>
+        <tr><td>scp file user@host:/path</td><td>Copy file to remote</td></tr>
+        <tr><td>rsync -av src/ dst/</td><td>Sync folders</td></tr>
+        <tr><td>dig &lt;domain&gt;</td><td>DNS lookup</td></tr>
+      </tbody></table>
+    </div>
+
+    <div id="tab-git" class="tab-panel">
+      <table class="cmd-table"><thead><tr><th>Command</th><th>Description</th></tr></thead><tbody>
+        <tr><td>git init / clone &lt;url&gt;</td><td>Init or clone repo</td></tr>
+        <tr><td>git status / diff</td><td>Check changes</td></tr>
+        <tr><td>git add . &amp;&amp; git commit -m "msg"</td><td>Stage and commit</td></tr>
+        <tr><td>git push / pull</td><td>Sync with remote</td></tr>
+        <tr><td>git log --oneline</td><td>Compact history</td></tr>
+        <tr><td>git checkout -b &lt;branch&gt;</td><td>Create and switch branch</td></tr>
+        <tr><td>git stash</td><td>Stash uncommitted changes</td></tr>
+        <tr><td>git blame</td><td>It was you. It's always you. 🫵</td></tr>
+      </tbody></table>
+    </div>
+
+    <div id="tab-packages" class="tab-panel">
+      <table class="cmd-table"><thead><tr><th>Command</th><th>Description</th></tr></thead><tbody>
+        <tr><td>apt install &lt;pkg&gt;</td><td>Install package (Debian/Ubuntu) <span class="warn">⚠</span></td></tr>
+        <tr><td>apt update &amp;&amp; apt upgrade</td><td>Update system <span class="warn">⚠</span></td></tr>
+        <tr><td>pip install &lt;pkg&gt;</td><td>Install Python package <span class="warn">⚠</span></td></tr>
+        <tr><td>pip list / pip show &lt;pkg&gt;</td><td>Inspect packages</td></tr>
+        <tr><td>npm install &lt;pkg&gt;</td><td>Install Node package <span class="warn">⚠</span></td></tr>
+        <tr><td>systemctl start/stop/restart</td><td>Control services <span class="warn">⚠</span></td></tr>
+        <tr><td>systemctl status &lt;svc&gt;</td><td>Check service status</td></tr>
+        <tr><td>journalctl -f</td><td>Follow system logs</td></tr>
+      </tbody></table>
+    </div>
+
+    <div id="tab-tts" class="tab-panel">
+      <table class="cmd-table"><thead><tr><th>Command</th><th>Description</th></tr></thead><tbody>
+        <tr><td>tts on</td><td>Enable TTS — 🔊 shows in prompt</td></tr>
+        <tr><td>tts off</td><td>Disable TTS</td></tr>
+        <tr><td>tts say &lt;text&gt;</td><td>Speak any text immediately</td></tr>
+        <tr><td>tts replay</td><td>Replay last chat reply</td></tr>
+        <tr><td>tts voice &lt;name&gt;</td><td>Change voice (Shubh, Ritu, Rahul...)</td></tr>
+        <tr><td>--tts</td><td>Quick toggle on/off while running</td></tr>
+      </tbody></table>
+      <p style="margin-top:16px;font-size:13px;color:var(--dim)">
+        Voices: Shubh · Aditya · Ritu · Priya · Neha · Rahul · Pooja · Rohan · Simran · Kavya · Amit · Dev · Ishita · Shreya · Varun · Kabir
+      </p>
+    </div>
+
+    <div id="tab-sashell" class="tab-panel">
+      <table class="cmd-table"><thead><tr><th>Command</th><th>Description</th></tr></thead><tbody>
+        <tr><td>help / --help</td><td>Full command reference</td></tr>
+        <tr><td>--version</td><td>Version and status info</td></tr>
+        <tr><td>lang &lt;X&gt;</td><td>Change AI response language live</td></tr>
+        <tr><td>lang</td><td>Show current language</td></tr>
+        <tr><td>fortune</td><td>Random terminal wisdom 🔮</td></tr>
+        <tr><td>i wanna talk with you</td><td>Open chat mode</td></tr>
+        <tr><td>back</td><td>Return from chat to shell</td></tr>
+        <tr><td>clear</td><td>Clear the screen</td></tr>
+        <tr><td>exit / quit</td><td>Leave SaShell</td></tr>
+      </tbody></table>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ── EASTER EGGS ── -->
+<section id="eggs">
+  <div class="reveal">
+    <div class="section-label">// secrets</div>
+    <h2 class="section-title">The shell has<br>a personality.</h2>
+    <p class="section-desc">30+ easter eggs hidden throughout. Type these phrases to discover them.</p>
+  </div>
+
+  <div class="eggs-grid reveal">
+    <div class="egg-card"><div class="egg-icon">🥪</div><div><div class="egg-phrase">sudo make me a sandwich</div><div class="egg-hint">Classic. Timeless.</div></div></div>
+    <div class="egg-card"><div class="egg-icon">💘</div><div><div class="egg-phrase">what is love</div><div class="egg-hint">Baby don't hurt me.</div></div></div>
+    <div class="egg-card"><div class="egg-icon">✨</div><div><div class="egg-phrase">meaning of life</div><div class="egg-hint">42. Obviously.</div></div></div>
+    <div class="egg-card"><div class="egg-icon">🤖</div><div><div class="egg-phrase">who are you</div><div class="egg-hint">SaShell introduces itself.</div></div></div>
+    <div class="egg-card"><div class="egg-icon">🫵</div><div><div class="egg-phrase">git blame</div><div class="egg-hint">It was you. It's always you.</div></div></div>
+    <div class="egg-card"><div class="egg-icon">🚢</div><div><div class="egg-phrase">it works on my machine</div><div class="egg-hint">We'll ship the machine.</div></div></div>
+    <div class="egg-card"><div class="egg-icon">🕳️</div><div><div class="egg-phrase">node_modules</div><div class="egg-hint">Heaviest object in the universe.</div></div></div>
+    <div class="egg-card"><div class="egg-icon">☸</div><div><div class="egg-phrase">kubernetes</div><div class="egg-hint">Nobody needs Kubernetes.</div></div></div>
+    <div class="egg-card"><div class="egg-icon">📝</div><div><div class="egg-phrase">vim</div><div class="egg-hint">Type :q! and walk away.</div></div></div>
+    <div class="egg-card"><div class="egg-icon">🤡</div><div><div class="egg-phrase">javascript</div><div class="egg-hint">NaN === NaN is false.</div></div></div>
+    <div class="egg-card"><div class="egg-icon">🧢</div><div><div class="egg-phrase">i use arch btw</div><div class="egg-hint">We know. Everyone knows.</div></div></div>
+    <div class="egg-card"><div class="egg-icon">🎲</div><div><div class="egg-phrase">yolo</div><div class="egg-hint">git push --force energy.</div></div></div>
+  </div>
+
+  <div class="egg-mystery reveal">🥚 &nbsp; More easter eggs are hidden. Type and explore. &nbsp; 🥚</div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ── ABOUT ── -->
+<section id="about">
+  <div class="reveal">
+    <div class="section-label">// about</div>
+    <h2 class="section-title">Built different.</h2>
+  </div>
+
+  <div class="about-grid reveal">
+    <div class="about-block">
+      <h3>What is SaShell?</h3>
+      <p>SaShell is a Python-based Linux shell that runs real commands natively — pipes, redirects, background jobs, everything bash supports.</p>
+      <p>The AI doesn't translate your words into commands. It watches what you type and only reacts when something is dangerous, misspelled, or just a meme.</p>
+      <p>It also packs a full conversational AI chat mode, Sarvam-powered text-to-speech in 16 Indian voices, multi-language support, and a terminal personality that refuses to be boring.</p>
+    </div>
+    <div class="about-block">
+      <h3>Tech Stack</h3>
+      <ul class="stack-list">
+        <li><span class="stack-key">Language</span><span class="stack-val">Python 3 (stdlib only)</span></li>
+        <li><span class="stack-key">AI Model</span><span class="stack-val">sarvam-m</span></li>
+        <li><span class="stack-key">TTS Engine</span><span class="stack-val">bulbul:v3 → pyttsx3</span></li>
+        <li><span class="stack-key">Shell executor</span><span class="stack-val">subprocess.run(shell=True)</span></li>
+        <li><span class="stack-key">History</span><span class="stack-val">readline → ~/.pyshell_history</span></li>
+        <li><span class="stack-key">Version</span><span class="stack-val">0.9.0</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ── FOOTER ── -->
+<div class="divider"></div>
+<footer>
+  <span class="footer-logo">sash</span>
+  <span class="footer-text">SaShell <span>v0.9.0</span> · Powered by Sarvam AI · Built with Python · <span>Stay chaotic. 🌀</span></span>
+</footer>
+
+<script>
+// ── Cursor ──
+const cursor = document.getElementById('cursor');
+document.addEventListener('mousemove', e => {
+  cursor.style.left = e.clientX + 'px';
+  cursor.style.top  = e.clientY - 4 + 'px';
+});
+
+// ── Tabs ──
+function showTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ── Terminal typewriter ──
+const lines = [
+  { cmd: 'ls -la', delay: 800, output: [
+    '<span class="t-dim">total 32</span>',
+    '<span class="t-ok">drwxr-xr-x</span> <span class="t-out">sashell/</span>',
+    '<span class="t-ok">-rw-r--r--</span> <span class="t-out">sashell.py</span>',
+    '<span class="t-ok">-rw-r--r--</span> <span class="t-out">README.md</span>',
+  ]},
+  { cmd: 'i wanna talk with you', delay: 2200, output: [
+    '<span class="t-cyan">  💬  CHAT MODE — SaShell is all ears</span>',
+  ]},
+  { cmd: 'what is love', delay: 4200, output: [
+    '<span class="t-warn">  💘  Baby don\'t hurt me... no more. (also: 42)</span>',
+  ]},
+  { cmd: 'rm -rf node_modules', delay: 6400, output: [
+    '<span class="t-warn">  ⚠  Dangerous command detected</span>',
+    '<span class="t-out">  Run it? [y/N]: </span>',
+  ]},
+];
+
+let lineIdx = 0;
+function runLine() {
+  if (lineIdx >= lines.length) { lineIdx = 0; }
+  const l = lines[lineIdx++];
+  const cmdEl = document.getElementById('typed-cmd');
+  const body = document.getElementById('terminal-demo');
+  cmdEl.textContent = '';
+  let ci = 0;
+  const type = setInterval(() => {
+    if (ci < l.cmd.length) { cmdEl.textContent += l.cmd[ci++]; }
+    else {
+      clearInterval(type);
+      setTimeout(() => {
+        // print output
+        const promptLine = cmdEl.closest('div');
+        promptLine.querySelector('.cursor-inline').style.display = 'none';
+        l.output.forEach(o => {
+          const d = document.createElement('div');
+          d.innerHTML = o;
+          body.insertBefore(d, promptLine.nextSibling.nextSibling || null);
+          body.appendChild(d);
+        });
+        // new prompt
+        setTimeout(() => {
+          const np = document.createElement('div');
+          np.innerHTML = '<span class="t-prompt">┌─[sash]─[~]</span>';
+          body.appendChild(np);
+          const nl = document.createElement('div');
+          nl.innerHTML = '<span class="t-prompt">└─▶ </span><span id="typed-cmd"></span><span class="cursor-inline"></span>';
+          body.appendChild(nl);
+          // keep scrolled
+          body.scrollTop = body.scrollHeight;
+          // trim old lines
+          while (body.children.length > 14) body.removeChild(body.firstChild);
+          setTimeout(runLine, 900);
+        }, 600);
+      }, 400);
+    }
+  }, 55);
+}
+setTimeout(runLine, l => l, 1200);
+// fix: just call directly
+setTimeout(runLine, 1200);
+
+// ── Scroll reveal ──
+const obs = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.1 });
+document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+</script>
+</body>
+</html>
