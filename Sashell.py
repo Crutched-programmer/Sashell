@@ -169,6 +169,8 @@ LOCAL_EGGS = {
     "thank you":               f"{LIME}💚  Just doing my job. Unlike your tests.{RESET}",
     "thanks":                  f"{LIME}💚  You're welcome. Now go write some docs.{RESET}",
     "rm -rf /":                f"{RED}🚨  Nice try, chaos agent. I have STANDARDS.{RESET}",
+    "i am hungry":             "SAMOSA",
+    "sudo i am hungry":        "SAMOSA",
     "it is what it is":        f"{GREY}🤷  Classic senior engineer response.{RESET}",
     "i am bored":              f"{LIME}😴  Have you tried rm -rf on your boredom? (don't){RESET}",
 }
@@ -322,6 +324,69 @@ def speak(text):
         clear_line()
         print(f"{RED}  TTS error: {e}{RESET}")
 
+
+
+# ── Spinning Donut (donut.c algorithm in Python) ─────────────────────────────
+def _show_samosa():
+    import math, sys
+    R1, R2, K2 = 1.0, 2.0, 5.0
+    W, H = 60, 28
+    K1 = H * K2 * 3 / (8 * (R1 + R2))
+    CHARS = ".,-~:;=!*#$@"
+    A, B = 0.0, 0.0
+    grad = [LIME, CYAN, AMBER, MAGENTA, LIME]
+    sys.stdout.write("\033[?25l"); sys.stdout.flush()
+    print()
+    try:
+        for frame in range(130):
+            out  = [" "] * (W * H)
+            zbuf = [0.0] * (W * H)
+            sinA, cosA = math.sin(A), math.cos(A)
+            sinB, cosB = math.sin(B), math.cos(B)
+            t = 0.0
+            while t < 6.2832:
+                sT, cT = math.sin(t), math.cos(t)
+                p = 0.0
+                while p < 6.2832:
+                    sP, cP = math.sin(p), math.cos(p)
+                    cx = R2 + R1 * cT
+                    cy = R1 * sT
+                    x  = cx*(cosB*cP + sinA*sinB*sP) - cy*cosA*sinB
+                    y  = cx*(sinB*cP - sinA*cosB*sP) + cy*cosA*cosB
+                    z  = K2 + cosA*cx*sP + cy*sinA
+                    iz = 1.0 / z
+                    px = int(W/2 + K1*iz*x)
+                    py = int(H/2 - K1*iz*y*0.5)
+                    L  = (cP*cT*sinB - cosA*cT*sP - sinA*sT + cosB*(cosA*sT - cT*sinA*sP))
+                    if 0 <= px < W and 0 <= py < H:
+                        idx = py*W + px
+                        if iz > zbuf[idx]:
+                            zbuf[idx] = iz
+                            li = int(L * 8)
+                            out[idx] = CHARS[max(0, li)] if li >= 0 else "."
+                    p += 0.07
+                t += 0.07
+            if frame > 0:
+                sys.stdout.write(f"\033[{H+2}A")
+            for row in range(H):
+                line = ""
+                for col in range(W):
+                    ch = out[row*W + col]
+                    if ch == " ":
+                        line += " "
+                    else:
+                        ci = int(col / W * (len(grad)-1))
+                        line += grad[ci] + ch + RESET
+                sys.stdout.write("  " + line + "\n")
+            sys.stdout.write("\n"); sys.stdout.flush()
+            A += 0.07; B += 0.03
+            time.sleep(0.033)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        sys.stdout.write("\033[?25h"); sys.stdout.flush()
+    print(f"\n  \U0001f369  {LIME}Here is a donut, bhai. You deserve it.{RESET}\n")
+
 # ── API key ───────────────────────────────────────────────────────────────────
 def get_api_key():
     import getpass
@@ -426,14 +491,7 @@ class AutoSuggestCompleter:
     def complete(self, text, state):
         if state == 0:
             self.matches = []
-            if text and HAS_READLINE:
-                n = _rl.get_current_history_length()
-                seen = set()
-                for i in range(n, 0, -1):
-                    item = _rl.get_history_item(i) or ""
-                    if item.startswith(text) and item != text and item not in seen:
-                        self.matches.append(item)
-                        seen.add(item)
+            pass  # history search removed
         try:
             return self.matches[state]
         except IndexError:
@@ -443,21 +501,14 @@ def setup_readline():
     if not HAS_READLINE:
         return
     try:
-        _rl.set_completer(AutoSuggestCompleter().complete)
-        _rl.parse_and_bind("tab: complete")
-        _rl.parse_and_bind(r'"\\C-r": reverse-search-history')
-        _rl.parse_and_bind("set show-all-if-ambiguous on")
-        _rl.parse_and_bind("set completion-ignore-case on")
+        _rl.set_completer(AutoSuggestCompleter().complete)  # type: ignore
+        _rl.parse_and_bind("tab: complete")                 # type: ignore
+        _rl.parse_and_bind("set show-all-if-ambiguous on")  # type: ignore
+        _rl.parse_and_bind("set completion-ignore-case on") # type: ignore
     except Exception:
         pass
 
-    history_file = os.path.expanduser("~/.sashell_history")
-    try:
-        _rl.read_history_file(history_file)
-    except FileNotFoundError:
-        pass
-    import atexit
-    atexit.register(_rl.write_history_file, history_file)
+
 
 # ── ASCII logo + gradient ─────────────────────────────────────────────────────
 ASCII_LOGO = [
@@ -844,8 +895,12 @@ def main():
         # ── Local easter eggs ─────────────────────────────────────────────
         if lower in LOCAL_EGGS:
             msg = LOCAL_EGGS[lower]
-            print(f"\n{msg}\n")
-            if TTS_ENABLED: speak(re.sub(r"\033\[[0-9;]*m", "", msg))
+            if msg == "SAMOSA":
+                _show_samosa()
+                if TTS_ENABLED: speak("Here is a donut bhai. You deserve it.")
+            else:
+                print(f"\n{msg}\n")
+                if TTS_ENABLED: speak(re.sub(r"\033\[[0-9;]*m", "", msg))
             continue
 
         # ── No-AI mode ────────────────────────────────────────────────────
