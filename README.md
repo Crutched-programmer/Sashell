@@ -3,7 +3,7 @@
 Real Linux shell with Sarvam AI as your safety net. Type real commands — AI only steps in when something looks dangerous, broken, or funny.
 
 ---
-## Current changes:Added an ASCII donut animation as an easter egg, removed the history feature to avoid code conflicts and fixed some functions.(fix stuff)
+<h3>Change log :Added an ASCII donut animation as an easter egg, removed the history feature to avoid code conflicts and fixed some functions.(fix stuff)</h3>
 ## Installation
 
 ```bash
