@@ -169,6 +169,9 @@ LOCAL_EGGS = {
     "thank you":               f"{LIME}💚  Just doing my job. Unlike your tests.{RESET}",
     "thanks":                  f"{LIME}💚  You're welcome. Now go write some docs.{RESET}",
     "rm -rf /":                f"{RED}🚨  Nice try, chaos agent. I have STANDARDS.{RESET}",
+    "sudo idk what the time is":  "CLOCK",
+    "what time is it":             "CLOCK",
+    "what is the time":            "CLOCK",
     "i am hungry":             "SAMOSA",
     "sudo i am hungry":        "SAMOSA",
     "it is what it is":        f"{GREY}🤷  Classic senior engineer response.{RESET}",
@@ -197,6 +200,28 @@ def is_dangerous(cmd):
 SARVAM_CHAT_URL = "https://api.sarvam.ai/v1/chat/completions"
 SARVAM_TTS_URL  = "https://api.sarvam.ai/text-to-speech"
 SARVAM_MODEL    = "sarvam-m"
+
+NL_SYSTEM = """You are a shell command translator. The user is on PLATFORM_PLACEHOLDER.
+Translate the user's plain English request into a shell command for their platform.
+Reply with EXACTLY this format and nothing else:
+COMMAND # short plain-English description (max 8 words)
+
+Rules:
+- One line only. No extra text, no markdown, no backticks, no thinking.
+- If on Windows/Git Bash use Windows-compatible commands (dir instead of ls, del instead of rm, etc)
+- If on Linux/Mac use standard bash commands
+
+Examples (Linux):
+User: list all files         → ls -la # list all files including hidden
+User: delete all files here  → rm -rf ./* # delete everything in current folder
+User: disk space             → df -h # show disk usage in human readable form
+User: go to home             → cd ~ # navigate to home directory
+
+Examples (Windows):
+User: list all files         → dir # list all files in current folder
+User: delete all files here  → del /q *.* # delete all files quietly
+User: go to home             → cd %USERPROFILE% # navigate to home directory
+"""
 
 JUDGE_SYSTEM = """You are SaShell's command safety judge. The user typed a command into a real Linux shell.
 Classify into exactly ONE category. Reply with ONLY that one word:
@@ -387,6 +412,128 @@ def _show_samosa():
         sys.stdout.write("\033[?25h"); sys.stdout.flush()
     print(f"\n  \U0001f369  {LIME}Here is a donut, bhai. You deserve it.{RESET}\n")
 
+
+# ── Analog Clock Easter Egg ───────────────────────────────────────────────────
+def _show_clock():
+    """Live ASCII analog clock in IST. Runs until Ctrl+C."""
+    import math, sys
+    import datetime
+
+    IST_OFFSET = 5.5   # hours ahead of UTC
+
+    RADIUS = 10
+    W      = RADIUS * 2 + 3
+    H      = RADIUS + 2   # half height (terminal chars are ~2x tall)
+
+    def _draw_frame(now):
+        h   = now.hour % 12 + now.minute / 60
+        m   = now.minute + now.second / 60
+        s   = now.second
+
+        # angles (12 o'clock = -pi/2)
+        ha  = math.pi * 2 * (h  / 12) - math.pi / 2
+        ma  = math.pi * 2 * (m  / 60) - math.pi / 2
+        sa  = math.pi * 2 * (s  / 60) - math.pi / 2
+
+        # hand lengths (in "half-height" units — multiply y by 2 for aspect)
+        h_len = RADIUS * 0.5
+        m_len = RADIUS * 0.8
+        s_len = RADIUS * 0.92
+
+        rows = H * 2 + 1
+        cols = W * 2 + 1
+        grid = [[' '] * cols for _ in range(rows)]
+
+        cx = W   # centre x
+        cy = H   # centre y (in half-height space)
+
+        # draw clock face
+        for angle_deg in range(0, 360, 6):
+            a = math.radians(angle_deg)
+            rx = int(cx + RADIUS * math.cos(a) * 1.0)
+            ry = int(cy + RADIUS * math.sin(a) * 0.5)
+            if 0 <= ry < rows and 0 <= rx < cols:
+                if angle_deg % 30 == 0:
+                    grid[ry][rx] = '●'   # hour marker
+                else:
+                    grid[ry][rx] = '·'   # minute marker
+
+        # draw hands using Bresenham-style line
+        def draw_hand(length, angle, char):
+            steps = int(length * 10)
+            for i in range(steps):
+                t = i / steps
+                rx = int(cx + length * math.cos(angle) * t * 1.0)
+                ry = int(cy + length * math.sin(angle) * t * 0.5)
+                if 0 <= ry < rows and 0 <= rx < cols:
+                    grid[ry][rx] = char
+
+        draw_hand(h_len, ha, BOLD + AMBER[:-1] + "m" + "█" + RESET)
+        draw_hand(m_len, ma, LIME + "▓" + RESET)
+        draw_hand(s_len, sa, MAGENTA + "░" + RESET)
+
+        # centre dot
+        grid[cy][cx] = CYAN + "◉" + RESET
+
+        return grid, rows, cols
+
+    sys.stdout.write("\033[?25l")
+    sys.stdout.flush()
+
+    try:
+        first = True
+        rows_printed = 0
+        while True:
+            utc_now = datetime.datetime.utcnow()
+            ist_now = utc_now + datetime.timedelta(hours=5, minutes=30)
+
+            grid, rows, cols = _draw_frame(ist_now)
+
+            if not first:
+                sys.stdout.write(f"\033[{rows_printed}A")
+
+            lines = []
+            for row in grid:
+                lines.append("  " + "".join(row))
+
+            # time text centred below
+            time_str = ist_now.strftime("%I:%M:%S %p  IST")
+            pad = max(0, (cols - len(time_str)) // 2)
+            lines.append(f"  {' ' * pad}{CYAN}{BOLD}{time_str}{RESET}")
+            lines.append(f"  {GREY}  Press Ctrl+C to exit{RESET}")
+
+            sys.stdout.write("\n".join(lines) + "\n")
+            sys.stdout.flush()
+            rows_printed = len(lines)
+            first = False
+            time.sleep(1)
+
+    except KeyboardInterrupt:
+        pass
+    finally:
+        sys.stdout.write("\033[?25h\n")
+        sys.stdout.flush()
+    print()
+
+# ── Calc ──────────────────────────────────────────────────────────────────────
+def _calc(expr: str) -> str | None:
+    """Evaluate a math expression safely. Supports + - * x / ^ % ( )"""
+    # normalise: x → *, ^ → **, spaces
+    expr = expr.strip()
+    expr = re.sub(r"(?<=[0-9])\s*[xX]\s*(?=[0-9])", "*", expr)  # 3x4 → 3*4
+    expr = expr.replace("^", "**")
+    expr = re.sub(r"[^0-9+\-*/().% ]", "", expr)   # strip anything dangerous
+    if not expr.strip():
+        return None
+    try:
+        result = eval(expr, {"__builtins__": {}}, {})   # sandboxed eval
+        # tidy up floats
+        if isinstance(result, float) and result == int(result):
+            return str(int(result))
+        return str(round(result, 10))
+    except Exception:
+        return None
+
 # ── API key ───────────────────────────────────────────────────────────────────
 def get_api_key():
     import getpass
@@ -558,9 +705,12 @@ def banner():
 
 # ── Prompts ───────────────────────────────────────────────────────────────────
 def shell_prompt():
+    import datetime
     cwd = os.getcwd().replace(os.path.expanduser("~"), "~")
     tts_tag = f"{GREEN}[🔊]{RESET}" if TTS_ENABLED else ""
-    print(f"{LAVENDER}┌─[{RESET}{LIME}sash{RESET}{LAVENDER}]─[{RESET}{CYAN}{cwd}{RESET}{LAVENDER}]{tts_tag}{RESET}")
+    ist = datetime.datetime.utcnow() + datetime.timedelta(hours=5, minutes=30)
+    clock_tag = f"{LAVENDER}─[{RESET}{DIM}{ist.strftime('%H:%M')}{RESET}{LAVENDER}]{RESET}"
+    print(f"{LAVENDER}┌─[{RESET}{LIME}sash{RESET}{LAVENDER}]─[{RESET}{CYAN}{cwd}{RESET}{LAVENDER}]{clock_tag}{tts_tag}{RESET}")
     return input(f"{LAVENDER}└─▶ {RESET}{AMBER}")
 
 def chat_prompt():
@@ -747,6 +897,8 @@ def show_help():
   {AMBER}lang <X>{RESET}                 change AI language
   {AMBER}theme / colour / color{RESET}   change theme
   {GREY}  Themes: default red blue pink gold purple matrix ocean{RESET}
+  {AMBER}--command <english>{RESET}      translate English to shell command
+  {GREY}  e.g. --command delete all files in this folder{RESET}
   {AMBER}fortune{RESET}                  terminal wisdom 🔮
   {AMBER}clear{RESET}                    clear screen
   {AMBER}exit / quit{RESET}              leave SaShell
@@ -892,10 +1044,112 @@ def main():
         if lower == "log open":
             os.system(f"nano {LOG_FILE}"); continue
 
+        # ── --command: plain English → shell command ──────────────────────
+        if user_input.startswith("--command"):
+            query = user_input[9:].lstrip(" :")
+            if not query:
+                print(f"{AMBER}  Usage: --command list all files in this folder{RESET}\n")
+                continue
+
+            # detect platform for the prompt
+            import platform as _platform
+            if sys.platform == "win32" or "mingw" in sys.version.lower() or "mingw" in os.environ.get("MSYSTEM","").lower() or _shutil.which("cmd") and not _shutil.which("bash"):
+                plat = "Windows / Git Bash (use Windows commands like dir, del, type, copy)"
+            else:
+                plat = "Linux / macOS (use standard bash commands)"
+
+            system_prompt = NL_SYSTEM.replace("PLATFORM_PLACEHOLDER", plat)
+
+            spinner_msg("translating...")
+            try:
+                raw = _call_sarvam([
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user",   "content": query},
+                ], max_tokens=512)
+            except Exception as e:
+                clear_line()
+                print(f"{RED}  Translation error: {e}{RESET}\n")
+                continue
+
+            clear_line()
+
+            # Strip ALL think blocks aggressively
+            raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
+            raw = re.sub(r"<think>.*", "", raw, flags=re.DOTALL).strip()
+            raw = raw.strip("`\'\n ")
+
+            # Debug: show raw response in dim grey
+            if not raw:
+                # fallback: try asking again with even simpler prompt
+                try:
+                    raw2 = _call_sarvam([
+                        {"role": "user", "content": f"Give me the Linux/Windows shell command to: {query}. Reply with ONLY the command, nothing else."},
+                    ], max_tokens=256)
+                    raw2 = re.sub(r"<think>.*?</think>", "", raw2, flags=re.DOTALL).strip()
+                    raw2 = re.sub(r"<think>.*", "", raw2, flags=re.DOTALL).strip()
+                    raw2 = raw2.strip("`\'\n ")
+                    raw = raw2
+                except Exception:
+                    pass
+
+            if not raw:
+                print(f"{AMBER}  Could not translate. Try rewording it.{RESET}\n")
+                continue
+
+            # Parse: COMMAND # explanation
+            if "#" in raw:
+                cmd, explanation = raw.split("#", 1)
+                cmd = cmd.strip()
+                explanation = explanation.strip()
+            else:
+                cmd = raw.strip()
+                explanation = ""
+
+            # Display: command (lime) + explanation (grey) aligned
+            col_cmd = 32
+            pad = max(2, col_cmd - len(cmd))
+            if explanation:
+                print(f"\n  {LIME}{BOLD}{cmd}{RESET}{' ' * pad}{GREY}{explanation}{RESET}")
+            else:
+                print(f"\n  {LIME}{BOLD}{cmd}{RESET}")
+
+            ans = input(f"{AMBER}  Run it? [Y/n]: {RESET}").strip().lower()
+            if ans in ("n", "no"):
+                print(f"{GREY}  Skipped.{RESET}\n")
+                continue
+
+            # Dangerous check
+            if is_dangerous(cmd):
+                print(f"\n{RED}  ⚠  Dangerous command. Are you sure?{RESET}")
+                ans2 = input(f"{AMBER}  Really run it? [y/N]: {RESET}").strip().lower()
+                if ans2 not in ("y", "yes"):
+                    print(f"{GREY}  Aborted.{RESET}\n")
+                    continue
+
+            print()
+            # Route cd as builtin so directory actually changes
+            parts = cmd.split()
+            if parts and parts[0] == "cd":
+                do_cd(parts[1:])
+            else:
+                run_command(cmd)
+            print()
+            continue
+
+        # ── Inline calc: detect math expressions like 16x32 or 2+2 ─────────
+        if re.match(r"^[\d\s\+\-\*/xX\^\%\(\)\.]+$", user_input.strip()) and any(c in user_input for c in "+-*/xX^%"):
+            result = _calc(user_input)
+            if result is not None:
+                print(f"  {LIME}{BOLD}{result}{RESET}\n")
+                continue
+
         # ── Local easter eggs ─────────────────────────────────────────────
         if lower in LOCAL_EGGS:
             msg = LOCAL_EGGS[lower]
-            if msg == "SAMOSA":
+            if msg == "CLOCK":
+                _show_clock()
+                continue
+            elif msg == "SAMOSA":
                 _show_samosa()
                 if TTS_ENABLED: speak("Here is a donut bhai. You deserve it.")
             else:
