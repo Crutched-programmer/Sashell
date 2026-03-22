@@ -9,7 +9,14 @@ Real Linux shell with Sarvam AI as your safety net. Type real commands — AI on
 - A new Calculator feature where you can directly type simple arithmetic quistions like 16x8 and the terminal will answer that sum for you.
 </h3>
 
-<video>https://github.com/user-attachments/assets/8548c0ec-96e5-4112-b6e0-a131c82d0d7d</video> 
+<video controls width="400" height="225" >
+  <source src="https://github.com/user-attachments/assets/8548c0ec-96e5-4112-b6e0-a131c82d0d7d" type="video/mp4" />
+ 
+  
+  <!-- Fallback content for browsers that do not support the video tag -->
+  Your browser does not support the video tag.
+</video>
+
 
 ## Installation
 
