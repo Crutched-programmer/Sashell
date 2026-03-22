@@ -413,98 +413,156 @@ def _show_samosa():
     print(f"\n  \U0001f369  {LIME}Here is a donut, bhai. You deserve it.{RESET}\n")
 
 
-# ── Analog Clock Easter Egg ───────────────────────────────────────────────────
+# ── Neon Analog + Digital Clock Easter Egg ──────────────────────────────────
 def _show_clock():
-    """Live ASCII analog clock in IST. Runs until Ctrl+C."""
-    import math, sys
-    import datetime
+    import math, sys, datetime
 
-    IST_OFFSET = 5.5   # hours ahead of UTC
+    # ── Fixed colour palette: dark purple, grey, cyan accent ──────────────
+    C_FACE   = "\033[38;5;55m"    # dark purple — face dots
+    C_HOUR   = "\033[38;5;93m"    # medium purple — hour markers
+    C_NUMS   = "\033[38;5;244m"   # grey — numbers
+    C_HAND_H = "\033[38;5;93m"    # dark purple — hour hand
+    C_HAND_M = "\033[38;5;244m"   # grey — minute hand
+    C_HAND_S = "\033[38;5;51m"    # cyan — second hand (only accent)
+    C_CENTER = "\033[38;5;51m"    # cyan — centre dot
+    C_DIG    = "\033[38;5;93m"    # dark purple — big digits
+    C_COLON  = "\033[38;5;244m"   # grey — colon in digits
+    C_DATE   = "\033[38;5;244m"   # grey — date text
+    C_LABEL  = "\033[38;5;55m"    # dark purple — IST label
 
-    RADIUS = 10
-    W      = RADIUS * 2 + 3
-    H      = RADIUS + 2   # half height (terminal chars are ~2x tall)
+    # ── Big 7-segment digits ───────────────────────────────────────────────
+    DIGITS = {
+        '0': ["█████","█   █","█   █","█   █","█████"],
+        '1': ["  █  ","  █  ","  █  ","  █  ","  █  "],
+        '2': ["█████","    █","█████","█    ","█████"],
+        '3': ["█████","    █","█████","    █","█████"],
+        '4': ["█   █","█   █","█████","    █","    █"],
+        '5': ["█████","█    ","█████","    █","█████"],
+        '6': ["█████","█    ","█████","█   █","█████"],
+        '7': ["█████","    █","    █","    █","    █"],
+        '8': ["█████","█   █","█████","█   █","█████"],
+        '9': ["█████","█   █","█████","    █","█████"],
+        ':': ["     ","  █  ","     ","  █  ","     "],
+        ' ': ["     ","     ","     ","     ","     "],
+    }
+
+    def render_digits(text):
+        rows = [""] * 5
+        for ch in text:
+            seg = DIGITS.get(ch, DIGITS[' '])
+            col = C_COLON if ch == ':' else C_DIG
+            for i in range(5):
+                rows[i] += col + seg[i] + RESET + " "
+        return rows
+
+    RADIUS = 18
+    ASPECT = 0.4
+    cols_c = RADIUS * 2 + 2
+    rows_c = int(RADIUS * ASPECT * 2) + 2
+    GW     = cols_c * 2 + 4
+    GH     = rows_c * 2 + 4
 
     def _draw_frame(now):
-        h   = now.hour % 12 + now.minute / 60
-        m   = now.minute + now.second / 60
-        s   = now.second
+        h_f = (now.hour % 12) + now.minute / 60 + now.second / 3600
+        m_f = now.minute + now.second / 60
+        s_f = now.second
 
-        # angles (12 o'clock = -pi/2)
-        ha  = math.pi * 2 * (h  / 12) - math.pi / 2
-        ma  = math.pi * 2 * (m  / 60) - math.pi / 2
-        sa  = math.pi * 2 * (s  / 60) - math.pi / 2
+        ha = math.pi * 2 * (h_f / 12) - math.pi / 2
+        ma = math.pi * 2 * (m_f / 60) - math.pi / 2
+        sa = math.pi * 2 * (s_f / 60) - math.pi / 2
 
-        # hand lengths (in "half-height" units — multiply y by 2 for aspect)
-        h_len = RADIUS * 0.5
-        m_len = RADIUS * 0.8
-        s_len = RADIUS * 0.92
+        grid = [[' '] * GW for _ in range(GH)]
 
-        rows = H * 2 + 1
-        cols = W * 2 + 1
-        grid = [[' '] * cols for _ in range(rows)]
-
-        cx = W   # centre x
-        cy = H   # centre y (in half-height space)
-
-        # draw clock face
-        for angle_deg in range(0, 360, 6):
-            a = math.radians(angle_deg)
-            rx = int(cx + RADIUS * math.cos(a) * 1.0)
-            ry = int(cy + RADIUS * math.sin(a) * 0.5)
-            if 0 <= ry < rows and 0 <= rx < cols:
-                if angle_deg % 30 == 0:
-                    grid[ry][rx] = '●'   # hour marker
+        # ── Face ──
+        for deg in range(0, 360, 1):
+            a  = math.radians(deg)
+            gx = int(RADIUS * math.cos(a) + cols_c + 1)
+            gy = int(RADIUS * math.sin(a) * ASPECT + rows_c + 1)
+            if 0 <= gy < GH and 0 <= gx < GW:
+                if deg % 30 == 0:
+                    grid[gy][gx] = C_HOUR + '◈' + RESET
+                elif deg % 6 == 0:
+                    grid[gy][gx] = C_FACE + '·' + RESET
                 else:
-                    grid[ry][rx] = '·'   # minute marker
+                    grid[gy][gx] = C_FACE + '.' + RESET
 
-        # draw hands using Bresenham-style line
-        def draw_hand(length, angle, char):
-            steps = int(length * 10)
+        # ── Hour numbers ──
+        nums = {0:'3',30:'4',60:'5',90:'6',120:'7',150:'8',
+                180:'9',210:'10',240:'11',270:'12',300:'1',330:'2'}
+        for deg, num in nums.items():
+            a  = math.radians(deg)
+            r  = RADIUS - 2
+            gx = int(r * math.cos(a) + cols_c + 1 - len(num)//2)
+            gy = int(r * math.sin(a) * ASPECT + rows_c + 1)
+            for i, ch in enumerate(num):
+                if 0 <= gy < GH and 0 <= gx+i < GW:
+                    grid[gy][gx+i] = C_NUMS + ch + RESET
+
+        # ── Draw hand ──
+        def draw_hand(angle, length, colour, body_h, body_v, tip):
+            steps = int(length * 30)
             for i in range(steps):
-                t = i / steps
-                rx = int(cx + length * math.cos(angle) * t * 1.0)
-                ry = int(cy + length * math.sin(angle) * t * 0.5)
-                if 0 <= ry < rows and 0 <= rx < cols:
-                    grid[ry][rx] = char
+                t  = i / steps
+                gx = int(length * math.cos(angle) * t + cols_c + 1)
+                gy = int(length * math.sin(angle) * t * ASPECT + rows_c + 1)
+                if 0 <= gy < GH and 0 <= gx < GW:
+                    if i >= steps - 3:
+                        ch = tip
+                    elif abs(math.sin(angle)) > 0.5:
+                        ch = body_v
+                    else:
+                        ch = body_h
+                    grid[gy][gx] = colour + ch + RESET
 
-        draw_hand(h_len, ha, BOLD + AMBER[:-1] + "m" + "█" + RESET)
-        draw_hand(m_len, ma, LIME + "▓" + RESET)
-        draw_hand(s_len, sa, MAGENTA + "░" + RESET)
+        draw_hand(ha, RADIUS * 0.50, C_HAND_H, '─', '│', '▲')
+        draw_hand(ma, RADIUS * 0.78, C_HAND_M, '─', '│', '▶')
+        draw_hand(sa, RADIUS * 0.92, C_HAND_S, '·', '·', '◆')
 
-        # centre dot
-        grid[cy][cx] = CYAN + "◉" + RESET
+        # ── Centre ──
+        grid[rows_c + 1][cols_c + 1] = C_CENTER + '◉' + RESET
 
-        return grid, rows, cols
+        return grid
 
     sys.stdout.write("\033[?25l")
     sys.stdout.flush()
+    os.system("clear")
 
     try:
-        first = True
-        rows_printed = 0
+        first      = True
+        total_rows = 0
+
         while True:
-            utc_now = datetime.datetime.utcnow()
-            ist_now = utc_now + datetime.timedelta(hours=5, minutes=30)
+            ist = datetime.datetime.utcnow() + datetime.timedelta(hours=5, minutes=30)
+            grid = _draw_frame(ist)
 
-            grid, rows, cols = _draw_frame(ist_now)
+            time_str = ist.strftime("%H:%M:%S")
+            dig_rows = render_digits(time_str)
+            date_str = ist.strftime("%A, %d %B %Y")
+            label    = "◈  INDIA STANDARD TIME  ◈"
 
-            if not first:
-                sys.stdout.write(f"\033[{rows_printed}A")
-
-            lines = []
+            lines = [""]
             for row in grid:
                 lines.append("  " + "".join(row))
+            lines.append("")
 
-            # time text centred below
-            time_str = ist_now.strftime("%I:%M:%S %p  IST")
-            pad = max(0, (cols - len(time_str)) // 2)
-            lines.append(f"  {' ' * pad}{CYAN}{BOLD}{time_str}{RESET}")
-            lines.append(f"  {GREY}  Press Ctrl+C to exit{RESET}")
+            dig_plain_w = len(re.sub(r'\033\[[0-9;]*m', '', dig_rows[0]))
+            dig_pad     = max(0, (GW - dig_plain_w) // 2)
+            for dr in dig_rows:
+                lines.append(" " * dig_pad + dr)
 
+            lines.append("")
+            date_pad  = max(0, (GW - len(date_str)) // 2 + 2)
+            label_pad = max(0, (GW - len(label)) // 2 + 2)
+            lines.append(" " * date_pad  + C_DATE  + date_str + RESET)
+            lines.append(" " * label_pad + C_LABEL + BOLD + label + RESET)
+            lines.append("")
+            lines.append("  " + GREY + "Ctrl+C to exit" + RESET)
+
+            if not first:
+                sys.stdout.write(f"\033[{total_rows}A")
             sys.stdout.write("\n".join(lines) + "\n")
             sys.stdout.flush()
-            rows_printed = len(lines)
+            total_rows = len(lines)
             first = False
             time.sleep(1)
 
