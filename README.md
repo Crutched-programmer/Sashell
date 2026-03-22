@@ -8,6 +8,9 @@ Real Linux shell with Sarvam AI as your safety net. Type real commands — AI on
 - Addded an ASCII analog vclock animation as an easter egg ( what is the time ) 
 - A new Calculator feature where you can directly type simple arithmetic quistions like 16x8 and the terminal will answer that sum for you.
 </h3>
+
+<img src='https://github.com/user-attachments/assets/2e72f59d-6686-4261-a6b2-d087d87b8600' />
+
 ## Installation
 
 ```bash
