@@ -1,4 +1,4 @@
-# SaShell MK 2.0.0!!!
+# SaShell MK 2.0.4!!!
 
 Real Linux shell with Sarvam AI as your safety net. Type real commands — AI only steps in when something looks dangerous, broken, or funny.
 
@@ -7,6 +7,7 @@ Real Linux shell with Sarvam AI as your safety net. Type real commands — AI on
 - A user can now type a command in plain english and the AI will translate that into actual linux commands which the user can select and run
 - Addded an ASCII analog vclock animation as an easter egg ( what is the time ) 
 - A new Calculator feature where you can directly type simple arithmetic quistions like 16x8 and the terminal will answer that sum for you.
+ -Added a new demo mode to showcase the shell's capabilities... 
 </h3>
 
 <img src='https://github.com/user-attachments/assets/ec5cbb1b-6dac-40c1-9cf5-6ff3397445d5' />
