@@ -67,7 +67,7 @@ def apply_theme(name):
 apply_theme("default")
 
 # ── Global state ──────────────────────────────────────────────────────────────
-SARVAM_API_KEY = "sk_v13x3ob5_TslaNd4aDKiufotX6jVHezQA"  # TODO: remove before push
+SARVAM_API_KEY = ""  #add you own sarvam api key.
 TTS_ENABLED    = False
 TTS_VOICE      = "anushka"
 LAST_MESSAGE   = ""
