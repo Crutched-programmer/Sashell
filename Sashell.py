@@ -456,7 +456,7 @@ def _show_clock():
         return rows
 
     RADIUS = 18
-    ASPECT = 0.4
+    ASPECT = 0.45
     cols_c = RADIUS * 2 + 2
     rows_c = int(RADIUS * ASPECT * 2) + 2
     GW     = cols_c * 2 + 4
@@ -487,8 +487,8 @@ def _show_clock():
                     grid[gy][gx] = C_FACE + '.' + RESET
 
         # ── Hour numbers ──
-        nums = {0:'3',30:'4',60:'5',90:'6',120:'7',150:'8',
-                180:'9',210:'10',240:'11',270:'12',300:'1',330:'2'}
+        nums = {0:'12',30:'1',60:'2',90:'3',120:'4',150:'5',
+                180:'6',210:'7',240:'8',270:'9',300:'10',330:'11'}
         for deg, num in nums.items():
             a  = math.radians(deg)
             r  = RADIUS - 2
@@ -895,6 +895,264 @@ def chat_mode():
         history.append({"role": "assistant", "content": reply})
         print_chat_reply(reply)
 
+
+# ── Demo mode ─────────────────────────────────────────────────────────────────
+def run_demo():
+    """Full capability demo — no user input needed."""
+    import datetime
+
+    def fake_prompt(cmd, delay=0.04):
+        """Simulate typing a command into the prompt."""
+        cwd = os.getcwd().replace(os.path.expanduser("~"), "~")
+        ist = datetime.datetime.utcnow() + datetime.timedelta(hours=5, minutes=30)
+        print(f"{LAVENDER}┌─[{RESET}{LIME}sash{RESET}{LAVENDER}]─[{RESET}{CYAN}{cwd}{RESET}{LAVENDER}]─[{RESET}{DIM}{ist.strftime('%H:%M')}{RESET}{LAVENDER}]{RESET}")
+        print(f"{LAVENDER}└─▶ {RESET}{AMBER}", end="", flush=True)
+        for ch in cmd:
+            print(ch, end="", flush=True)
+            time.sleep(delay)
+        print(RESET)
+        time.sleep(0.3)
+
+    def section(title):
+        cols = shutil.get_terminal_size().columns
+        bar = "─" * min(cols - 4, 56)
+        print(f"\n{LAVENDER}  ┌{bar}┐{RESET}")
+        print(f"{LAVENDER}  │{RESET}{CYAN}{BOLD}  {title:^{len(bar)-2}}  {RESET}{LAVENDER}│{RESET}")
+        print(f"{LAVENDER}  └{bar}┘{RESET}\n")
+        time.sleep(0.6)
+
+    def pause(n=1.2):
+        time.sleep(n)
+
+    os.system("clear")
+
+    # ── Banner ────────────────────────────────────────────────────────────
+    for line in ASCII_LOGO:
+        print("  " + _gradient_line(line, 3))
+    print()
+    print(f"  {GREY}Real Linux shell · Sarvam AI · v{VERSION}{RESET}")
+    print(f"  {DIM}Starting demo mode...{RESET}\n")
+    time.sleep(1.5)
+
+    # ── 1. Basic shell commands ───────────────────────────────────────────
+    section("① REAL SHELL COMMANDS")
+    fake_prompt("echo Hello from SaShell!")
+    print(f"  Hello from SaShell!\n")
+    pause()
+
+    fake_prompt("ls")
+    result = subprocess.run("ls", shell=True, capture_output=True, text=True)
+    if result.stdout:
+        for line in result.stdout.strip().split("\n")[:6]:
+            print(f"  {line}")
+    else:
+        print(f"  {GREY}(no files){RESET}")
+    print()
+    pause()
+
+    fake_prompt("date")
+    result = subprocess.run("date", shell=True, capture_output=True, text=True)
+    print(f"  {result.stdout.strip()}\n")
+    pause()
+
+    # ── 2. Inline calc ────────────────────────────────────────────────────
+    section("② INLINE CALCULATOR")
+    for expr, ans in [("16 x 32", "512"), ("2 ^ 10", "1024"), ("(99 + 1) / 4", "25")]:
+        fake_prompt(expr, delay=0.06)
+        r = _calc(expr.replace(" ", ""))
+        print(f"  {LIME}{BOLD}{r or ans}{RESET}\n")
+        pause(0.8)
+
+    # ── 3. AI Safety net demo ─────────────────────────────────────────────
+    section("③ AI SAFETY NET")
+    fake_prompt("rmo -rf .")
+    print(f"\n{AMBER}  ✏  Did you mean: {BOLD}rm -rf .{RESET}")
+    print(f"{AMBER}  Run the fixed command? [Y/n]: {RESET}n")
+    print(f"{GREY}  Aborted.{RESET}\n")
+    pause()
+
+    fake_prompt("rm -rf /")
+    print(f"\n{RED}  ⚠  Dangerous command:{RESET} {BOLD}rm -rf /{RESET}")
+    print(f"{AMBER}  Run it? [y/N]: {RESET}n")
+    print(f"{GREY}  Aborted. Wise choice.{RESET}\n")
+    pause()
+
+    # ── 4. --command English to shell ────────────────────────────────────
+    section("④ ENGLISH → SHELL  (--command)")
+    fake_prompt("--command show disk usage")
+    time.sleep(0.4)
+    print(f"\n  {LIME}{BOLD}df -h{RESET}                          show disk usage in human readable form")
+    print(f"{AMBER}  Run it? [Y/n]: {RESET}y\n")
+    result = subprocess.run("df -h", shell=True, capture_output=True, text=True)
+    for line in (result.stdout or "").strip().split("\n")[:4]:
+        print(f"  {line}")
+    print()
+    pause()
+
+    # ── 5. Notes ─────────────────────────────────────────────────────────
+    section("⑤ QUICK NOTES")
+    fake_prompt("note add SaShell demo is running great!")
+    with open(NOTES_FILE, "a") as f:
+        f.write(f"[demo] SaShell demo is running great!\n")
+    print(f"  {LIME}✓  Note saved.{RESET}\n")
+    pause(0.8)
+
+    fake_prompt("note list")
+    note_cmd(["note", "list"])
+    pause()
+
+    # ── 6. Fortune ───────────────────────────────────────────────────────
+    section("⑥ FORTUNE")
+    fake_prompt("fortune")
+    msg = random.choice(FORTUNES)
+    print(f"\n{MAGENTA}  🔮  {msg}{RESET}\n")
+    pause(1.5)
+
+    # ── 7. Easter egg ────────────────────────────────────────────────────
+    section("⑦ EASTER EGG")
+    fake_prompt("git blame")
+    time.sleep(0.3)
+    print(f"\n{LOCAL_EGGS['git blame']}\n")
+    pause()
+
+    fake_prompt("what is love")
+    time.sleep(0.3)
+    print(f"\n{LOCAL_EGGS['what is love']}\n")
+    pause()
+
+    # ── 8. Themes ─────────────────────────────────────────────────────────
+    section("⑧ COLOUR THEMES")
+    for t in ["matrix", "ocean", "pink", "default"]:
+        fake_prompt(f"theme {t}", delay=0.08)
+        apply_theme(t)
+        pause(0.7)
+    pause()
+
+    # ── 9. Spinning donut ─────────────────────────────────────────────────
+    section("⑨ SPINNING DONUT  🍩")
+    fake_prompt("sudo i am hungry")
+    time.sleep(0.5)
+    _show_samosa()
+    pause(0.5)
+
+    # ── 10. Clock ────────────────────────────────────────────────────────
+    section("⑩ LIVE CLOCK  (10 seconds)")
+    fake_prompt("sudo idk what the time is")
+    time.sleep(0.5)
+
+    # Run clock for 10 seconds then auto-exit
+    import math, datetime as _dt, sys as _sys
+    C_FACE  = "\033[38;5;55m"
+    C_HOUR_M= "\033[38;5;93m"
+    C_MIN_M = "\033[38;5;244m"
+    C_NUMS  = "\033[38;5;141m"
+    C_H_HAND= "\033[38;5;98m"
+    C_M_HAND= "\033[38;5;135m"
+    C_S_HAND= "\033[38;5;244m"
+    C_CENTRE= "\033[38;5;93m"
+    C_DIGITS= "\033[38;5;141m"
+    C_DATE  = "\033[38;5;244m"
+    C_LABEL = "\033[38;5;55m"
+    DIGITS_D = {
+        '0':["█████","█   █","█   █","█   █","█████"],
+        '1':["  █  ","  █  ","  █  ","  █  ","  █  "],
+        '2':["█████","    █","█████","█    ","█████"],
+        '3':["█████","    █","█████","    █","█████"],
+        '4':["█   █","█   █","█████","    █","    █"],
+        '5':["█████","█    ","█████","    █","█████"],
+        '6':["█████","█    ","█████","█   █","█████"],
+        '7':["█████","    █","    █","    █","    █"],
+        '8':["█████","█   █","█████","█   █","█████"],
+        '9':["█████","█   █","█████","    █","█████"],
+        ':':["     ","  █  ","     ","  █  ","     "],
+        ' ':["     ","     ","     ","     ","     "],
+    }
+    def _rdig(text):
+        rows = [""] * 5
+        for ch in text:
+            seg = DIGITS_D.get(ch, DIGITS_D[' '])
+            for i in range(5):
+                rows[i] += C_DIGITS + seg[i] + RESET + " "
+        return rows
+
+    RADIUS_D = 12
+    ASPECT_D = 0.45
+    cols_d   = RADIUS_D * 2 + 2
+    rows_d   = int(RADIUS_D * ASPECT_D * 2) + 2
+
+    def _mini_clock_frame(now):
+        h_f = (now.hour % 12) + now.minute/60 + now.second/3600
+        m_f = now.minute + now.second/60
+        s_f = now.second
+        ha = math.pi*2*(h_f/12) - math.pi/2
+        ma = math.pi*2*(m_f/60) - math.pi/2
+        sa = math.pi*2*(s_f/60) - math.pi/2
+        GW = cols_d*2+4; GH = rows_d*2+4
+        grid = [[' ']*GW for _ in range(GH)]
+        for deg in range(0, 360, 1):
+            a = math.radians(deg-90)
+            cx = RADIUS_D*math.cos(a); cy = RADIUS_D*math.sin(a)
+            gx = int(cx+cols_d+1); gy = int(cy*ASPECT_D+rows_d+1)
+            if 0<=gy<GH and 0<=gx<GW:
+                if deg%30==0: grid[gy][gx] = C_HOUR_M+'◈'+RESET
+                elif deg%6==0: grid[gy][gx] = C_FACE+'·'+RESET
+                else: grid[gy][gx] = C_MIN_M+'.'+RESET
+        nums_d = {0:'12',30:'1',60:'2',90:'3',120:'4',150:'5',
+                  180:'6',210:'7',240:'8',270:'9',300:'10',330:'11'}
+        for deg,num in nums_d.items():
+            a = math.radians(deg-90); r = RADIUS_D-2
+            gx = int(r*math.cos(a)+cols_d+1-len(num)/2)
+            gy = int(r*math.sin(a)*ASPECT_D+rows_d+1)
+            for i,ch in enumerate(num):
+                if 0<=gy<GH and 0<=gx+i<GW:
+                    grid[gy][gx+i] = C_NUMS+ch+RESET
+        def dh(angle, length, colour, tip, body):
+            for i in range(int(length*25)):
+                t = i/int(length*25)
+                gx = int(length*math.cos(angle)*t+cols_d+1)
+                gy = int(length*math.sin(angle)*ASPECT_D*t+rows_d+1)
+                if 0<=gy<GH and 0<=gx<GW:
+                    grid[gy][gx] = colour+(tip if i>=int(length*25)-3 else body)+RESET
+        dh(ha,RADIUS_D*0.50,C_H_HAND,'▲','│' if abs(math.sin(ha))>0.5 else '─')
+        dh(ma,RADIUS_D*0.78,C_M_HAND,'▶','│' if abs(math.sin(ma))>0.5 else '─')
+        dh(sa,RADIUS_D*0.92,C_S_HAND,'◆','·')
+        grid[rows_d+1][cols_d+1] = C_CENTRE+'◉'+RESET
+        return grid, GH, GW
+
+    _sys.stdout.write("\033[?25l"); _sys.stdout.flush()
+    first_c = True; rows_c = 0
+    for _ in range(10):
+        ist_c = _dt.datetime.utcnow() + _dt.timedelta(hours=5, minutes=30)
+        grid_c, GH_c, GW_c = _mini_clock_frame(ist_c)
+        dr = _rdig(ist_c.strftime("%H:%M:%S"))
+        dw = len(re.sub(r'\033\[[0-9;]*m','',dr[0]))
+        dp = max(0,(GW_c-dw)//2)
+        lines_c = [""]
+        for row in grid_c: lines_c.append("  "+"".join(row))
+        lines_c.append("")
+        for r in dr: lines_c.append(" "*dp+r)
+        lines_c.append("")
+        date_s = ist_c.strftime("%A, %d %B %Y")
+        lines_c.append("  "+C_DATE+date_s+RESET)
+        lines_c.append("  "+C_LABEL+BOLD+"◈  INDIA STANDARD TIME  ◈"+RESET)
+        lines_c.append("")
+        if not first_c: _sys.stdout.write(f"\033[{rows_c}A")
+        _sys.stdout.write("\n".join(lines_c)+"\n"); _sys.stdout.flush()
+        rows_c = len(lines_c); first_c = False
+        time.sleep(1)
+    _sys.stdout.write("\033[?25h"); _sys.stdout.flush()
+    print()
+    pause()
+
+    # ── Done ─────────────────────────────────────────────────────────────
+    cols = shutil.get_terminal_size().columns
+    bar = "═" * min(cols - 4, 56)
+    print(f"\n{LIME}{BOLD}  {bar}{RESET}")
+    done_msg = "  ✅  DEMO COMPLETE — That's SaShell!  "
+    print(f"{LIME}{BOLD}  {done_msg:^{len(bar)}}{RESET}")
+    print(f"{LIME}{BOLD}  {bar}{RESET}\n")
+    print(f"  {GREY}Run {BOLD}python3 sashell.py{RESET}{GREY} to start for real.{RESET}\n")
+
 # ── Help ──────────────────────────────────────────────────────────────────────
 def show_help():
     tts = f"{GREEN}ON ({TTS_VOICE}){RESET}" if TTS_ENABLED else f"{GREY}OFF{RESET}"
@@ -1002,6 +1260,9 @@ def main():
             apply_theme(a.split("=", 1)[1].strip())
     if "--version" in args:
         print(f"SaShell v{VERSION}")
+        sys.exit(0)
+    if "--demo" in args:
+        run_demo()
         sys.exit(0)
     if "--help" in args or "-h" in args:
         print(f"\n{LIME}{BOLD}SaShell v{VERSION}{RESET}")
