@@ -67,7 +67,7 @@ def apply_theme(name):
 apply_theme("default")
 
 # ── Global state ──────────────────────────────────────────────────────────────
-SARVAM_API_KEY = ""  #add you own sarvam api key.
+SARVAM_API_KEY = "sk_v13x3ob5_TslaNd4aDKiufotX6jVHezQA"  # TODO: remove before push
 TTS_ENABLED    = False
 TTS_VOICE      = "anushka"
 LAST_MESSAGE   = ""
@@ -467,9 +467,9 @@ def _show_clock():
         m_f = now.minute + now.second / 60
         s_f = now.second
 
-        ha = math.pi * 2 * (h_f / 12) - math.pi / 2
-        ma = math.pi * 2 * (m_f / 60) - math.pi / 2
-        sa = math.pi * 2 * (s_f / 60) - math.pi / 2
+        ha = math.pi * 2 * (h_f / 12) - math.pi / 2 # 12 o clock is at 90 degrees so 180/2.
+        ma = math.pi * 2 * (m_f / 60) - math.pi / 2 # 12 o clock is at 90 degrees so 180/2.
+        sa = math.pi * 2 * (s_f / 60) - math.pi / 2 # 12 o clock is at 90 degrees so 180/2.
 
         grid = [[' '] * GW for _ in range(GH)]
 
