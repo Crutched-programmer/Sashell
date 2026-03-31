@@ -1,0 +1,3 @@
+# Ignore all HTML files from language stats (mark as documentation)
+*.html linguist-documentation=true
+docs/** linguist-documentation=true
