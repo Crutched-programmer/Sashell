@@ -67,7 +67,7 @@ def apply_theme(name):
 apply_theme("default")
 
 # ── Global state ──────────────────────────────────────────────────────────────
-SARVAM_API_KEY = "sk_v13x3ob5_TslaNd4aDKiufotX6jVHezQA"  # TODO: remove before push
+SARVAM_API_KEY = "SARVAM_API_KEY" #paste your api key here
 TTS_ENABLED    = False
 TTS_VOICE      = "anushka"
 LAST_MESSAGE   = ""
@@ -90,6 +90,215 @@ def log(line):
             f.write(f"[{datetime.now().strftime('%H:%M:%S')}] {line}\n")
     except Exception:
         pass
+
+# ── Plugin system ─────────────────────────────────────────────────────────────
+# Drop any .py file into ~/.sashell/plugins/ and it auto-loads on startup.
+# Each plugin must define:
+#   PLUGIN_NAME    = "myplug"          (str)  — the command name
+#   PLUGIN_HELP    = "what it does"    (str)  — shown in plugin list
+#   def run(tokens, ctx): ...          (func) — called when user types PLUGIN_NAME
+#       tokens = user_input.split()
+#       ctx    = dict with: LIME, CYAN, AMBER, RED, GREY, MAGENTA, LAVENDER,
+#                           RESET, BOLD, DIM, GREEN, PINK, ORANGE,
+#                           speak, run_command, print_chat_reply,
+#                           TTS_ENABLED (read-only snapshot at call time)
+
+PLUGINS_DIR = os.path.join(CONFIG_DIR, "plugins")
+os.makedirs(PLUGINS_DIR, exist_ok=True)
+
+# Registry: maps command name → {name, help, run, path}
+PLUGIN_REGISTRY: dict = {}
+
+def _load_plugins():
+    """Import every .py file in the plugins directory and register it."""
+    import importlib.util
+    for fname in sorted(os.listdir(PLUGINS_DIR)):
+        if not fname.endswith(".py"):
+            continue
+        fpath = os.path.join(PLUGINS_DIR, fname)
+        try:
+            spec   = importlib.util.spec_from_file_location(fname[:-3], fpath)
+            module = importlib.util.module_from_spec(spec)   # type: ignore
+            spec.loader.exec_module(module)                  # type: ignore
+
+            # Validate required attributes
+            name = getattr(module, "PLUGIN_NAME", None)
+            help_text = getattr(module, "PLUGIN_HELP", "(no description)")
+            run_fn = getattr(module, "run", None)
+
+            if not name or not callable(run_fn):
+                print(f"{AMBER}  Plugin {fname}: missing PLUGIN_NAME or run(). Skipped.{RESET}")
+                continue
+
+            PLUGIN_REGISTRY[name.lower()] = {
+                "name":   name,
+                "help":   help_text,
+                "run":    run_fn,
+                "path":   fpath,
+            }
+        except Exception as e:
+            print(f"{RED}  Plugin load error ({fname}): {e}{RESET}")
+
+def _plugin_context():
+    """Build the context dict passed to plugin run() calls."""
+    return {
+        # Colours
+        "LIME": LIME, "CYAN": CYAN, "AMBER": AMBER, "RED": RED,
+        "GREY": GREY, "MAGENTA": MAGENTA, "LAVENDER": LAVENDER,
+        "GREEN": GREEN, "PINK": PINK, "ORANGE": ORANGE,
+        "RESET": RESET, "BOLD": BOLD, "DIM": DIM,
+        # Helpers plugins can call
+        "speak":            speak,
+        "run_command":      run_command,
+        "print_chat_reply": print_chat_reply,
+        "TTS_ENABLED":      TTS_ENABLED,
+    }
+
+def show_plugins():
+    """Print the list of loaded plugins."""
+    if not PLUGIN_REGISTRY:
+        print(f"\n{GREY}  No plugins loaded. Drop .py files into: {PLUGINS_DIR}{RESET}\n")
+        return
+    cols  = shutil.get_terminal_size().columns
+    bar   = "─" * min(cols - 4, 56)
+    print(f"\n{LAVENDER}{BOLD}  ┌{bar}┐{RESET}")
+    print(f"{LAVENDER}{BOLD}  │{'  🔌  LOADED PLUGINS':^{len(bar)}}│{RESET}")
+    print(f"{LAVENDER}{BOLD}  ├{bar}┤{RESET}")
+    for pname, info in PLUGIN_REGISTRY.items():
+        label   = f"  {pname:<16} {info['help']}"
+        trunced = label[:len(bar) - 2]
+        pad     = max(0, len(bar) - len(trunced) - 1)
+        print(f"{LAVENDER}  │{RESET}{CYAN}{BOLD}  {pname:<14}{RESET} {GREY}{info['help'][:len(bar)-20]}{RESET}{' '*pad}{LAVENDER}│{RESET}")
+    print(f"{LAVENDER}  │{RESET}  {GREY}Plugin dir: {PLUGINS_DIR}{' '*(len(bar)-len(PLUGINS_DIR)-14)}{LAVENDER}│{RESET}")
+    print(f"{LAVENDER}{BOLD}  └{bar}┘{RESET}\n")
+
+# ── Sysinfo panel ─────────────────────────────────────────────────────────────
+def show_sysinfo():
+    """Display a compact CPU / RAM / Disk / uptime panel using only stdlib."""
+    import platform, datetime
+
+    def _read_file(path):
+        """Safely read a single-line proc file, return '' on error."""
+        try:
+            with open(path) as f:
+                return f.read().strip()
+        except Exception:
+            return ""
+
+    # ── CPU usage (two /proc/stat samples, 200 ms apart) ────────────────
+    def _cpu_percent():
+        def _stat():
+            line = _read_file("/proc/stat").splitlines()[0].split()
+            vals = list(map(int, line[1:]))
+            idle  = vals[3]
+            total = sum(vals)
+            return idle, total
+        try:
+            i1, t1 = _stat()
+            time.sleep(0.2)
+            i2, t2 = _stat()
+            dt = t2 - t1
+            di = i2 - i1
+            return round(100 * (1 - di / dt)) if dt else 0
+        except Exception:
+            return -1
+
+    # ── RAM from /proc/meminfo ───────────────────────────────────────────
+    def _ram():
+        try:
+            info = {}
+            for line in _read_file("/proc/meminfo").splitlines():
+                k, v = line.split(":", 1)
+                info[k.strip()] = int(v.strip().split()[0])   # values in kB
+            total  = info.get("MemTotal",  0)
+            avail  = info.get("MemAvailable", 0)
+            used   = total - avail
+            pct    = round(100 * used / total) if total else 0
+            def _mb(kb): return f"{kb // 1024} MB" if kb < 1024*1024 else f"{kb/1024/1024:.1f} GB"
+            return _mb(used), _mb(total), pct
+        except Exception:
+            return "?", "?", 0
+
+    # ── Disk usage via df ────────────────────────────────────────────────
+    def _disk():
+        try:
+            out = subprocess.check_output(
+                ["df", "-h", "/"], stderr=subprocess.DEVNULL
+            ).decode().splitlines()
+            if len(out) >= 2:
+                parts = out[1].split()
+                # df columns: Filesystem Size Used Avail Use% Mounted
+                return parts[2], parts[1], parts[4]   # used, total, pct-str
+        except Exception:
+            pass
+        return "?", "?", "?%"
+
+    # ── Uptime from /proc/uptime ─────────────────────────────────────────
+    def _uptime():
+        try:
+            secs = float(_read_file("/proc/uptime").split()[0])
+            h, rem = divmod(int(secs), 3600)
+            m, s   = divmod(rem, 60)
+            return f"{h}h {m}m {s}s"
+        except Exception:
+            return "?"
+
+    # ── Load average ─────────────────────────────────────────────────────
+    def _load():
+        try:
+            vals = _read_file("/proc/loadavg").split()[:3]
+            return "  ".join(vals)
+        except Exception:
+            return "?"
+
+    # ── Gather everything ────────────────────────────────────────────────
+    cpu_pct             = _cpu_percent()
+    ram_used, ram_total, ram_pct = _ram()
+    disk_used, disk_total, disk_pct = _disk()
+    uptime_str          = _uptime()
+    load_str            = _load()
+    hostname            = platform.node()
+    kernel              = platform.release()
+
+    # ── Colour-code the usage bars ───────────────────────────────────────
+    def _bar(pct, width=20):
+        """Draw a coloured ASCII bar for a percentage value."""
+        if isinstance(pct, str):
+            pct = int(pct.strip("%")) if pct.strip("%").isdigit() else 0
+        filled = int(width * pct / 100)
+        empty  = width - filled
+        if pct >= 85:   colour = RED
+        elif pct >= 60: colour = AMBER
+        else:           colour = GREEN
+        return colour + "█" * filled + GREY + "░" * empty + RESET + f" {pct}%"
+
+    cpu_bar  = _bar(cpu_pct)
+    ram_bar  = _bar(ram_pct)
+    disk_bar = _bar(disk_pct)
+
+    # ── Print the panel ──────────────────────────────────────────────────
+    cols = shutil.get_terminal_size().columns
+    bar  = "─" * min(cols - 4, 60)
+    print(f"\n{CYAN}{BOLD}  ┌{bar}┐{RESET}")
+    print(f"{CYAN}{BOLD}  │{'  ⚙  SYSTEM':^{len(bar)}}│{RESET}")
+    print(f"{CYAN}{BOLD}  ├{bar}┤{RESET}")
+
+    def row(label, value):
+        lbl_plain  = f"  {label:<10}"
+        # strip ANSI for length calc
+        val_plain  = re.sub(r"\033\[[0-9;]*m", "", value)
+        pad        = max(0, len(bar) - len(lbl_plain) - len(val_plain) - 1)
+        print(f"{CYAN}  │{RESET}{GREY}{BOLD}  {label:<10}{RESET}{value}{' '*pad}{CYAN}│{RESET}")
+
+    row("Host",   f"{LIME}{hostname}{RESET}")
+    row("Kernel", f"{GREY}{kernel}{RESET}")
+    row("Uptime", f"{LAVENDER}{uptime_str}{RESET}")
+    row("Load",   f"{AMBER}{load_str}{RESET}")
+    print(f"{CYAN}  ├{bar}┤{RESET}")
+    row("CPU",    cpu_bar)
+    row("RAM",    f"{ram_bar}  {GREY}({ram_used} / {ram_total}){RESET}")
+    row("Disk /", f"{disk_bar}  {GREY}({disk_used} / {disk_total}){RESET}")
+    print(f"{CYAN}  └{bar}┘{RESET}\n")
 
 # ── Boot messages / fortunes ──────────────────────────────────────────────────
 BOOT_MESSAGES = [
@@ -291,9 +500,15 @@ def _speak_pyttsx3(text):
         print(f"{RED}  pyttsx3 error: {e}{RESET}")
 
 def speak(text):
+    """Send text to Sarvam TTS API and play the returned WAV audio.
+    Falls back to pyttsx3 only if the API genuinely fails (not silently)."""
     if not text.strip():
         return
+
+    # Strip ANSI colour codes and trim to API limit
     clean = re.sub(r"\033\[[0-9;]*m", "", text).strip()[:2500]
+
+    # Build the TTS request payload
     payload = json.dumps({
         "inputs": [clean],
         "target_language_code": "en-IN",
@@ -302,52 +517,107 @@ def speak(text):
         "speech_sample_rate": 22050,
         "enable_preprocessing": True,
         "pace": 1.0,
-    }).encode()
+    }).encode("utf-8")
+
     req = urllib.request.Request(
-        SARVAM_TTS_URL, data=payload,
-        headers={"Content-Type": "application/json", "api-subscription-key": SARVAM_API_KEY},
+        SARVAM_TTS_URL,
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            # Sarvam uses api-subscription-key header — NOT Authorization Bearer
+            "api-subscription-key": SARVAM_API_KEY,
+        },
         method="POST",
     )
+
+    spinner_msg("🔊 generating audio...")
+
     try:
-        spinner_msg("🔊 generating audio...")
+        # ── Make the API call ────────────────────────────────────────────
         try:
             with urllib.request.urlopen(req, timeout=30) as resp:
                 raw_resp = resp.read()
-        except urllib.error.HTTPError as e:
+        except urllib.error.HTTPError as http_err:
+            # Read the error body so we can show a useful message
+            err_body = ""
+            try:
+                err_body = http_err.read().decode("utf-8", errors="replace")
+            except Exception:
+                pass
             clear_line()
-            if e.code in (400, 401, 403):
-                print(f"{AMBER}  🔊 Sarvam TTS unavailable — using offline voice.{RESET}")
+            print(f"{RED}  TTS HTTP {http_err.code}: {err_body[:200]}{RESET}")
+            # Only fall back to pyttsx3 on auth / bad-request errors, not silently
+            if http_err.code in (400, 401, 403, 422):
+                print(f"{AMBER}  Falling back to offline TTS.{RESET}")
                 _speak_pyttsx3(clean)
-            else:
-                print(f"{RED}  TTS error {e.code}: {e.read().decode()}{RESET}")
             return
+        except urllib.error.URLError as url_err:
+            clear_line()
+            print(f"{RED}  TTS network error: {url_err.reason}{RESET}")
+            print(f"{AMBER}  Falling back to offline TTS.{RESET}")
+            _speak_pyttsx3(clean)
+            return
+
         clear_line()
-        data = json.loads(raw_resp.decode())
+
+        # ── Parse the JSON response ──────────────────────────────────────
+        try:
+            data = json.loads(raw_resp.decode("utf-8"))
+        except json.JSONDecodeError:
+            print(f"{RED}  TTS: non-JSON response from Sarvam. Raw: {raw_resp[:100]}{RESET}")
+            _speak_pyttsx3(clean)
+            return
+
         audios = data.get("audios", [])
         if not audios:
-            print(f"{AMBER}  Sarvam TTS returned no audio — using offline voice.{RESET}")
+            # Show what the API actually returned so we can diagnose
+            print(f"{RED}  TTS: API returned no audio. Response: {str(data)[:200]}{RESET}")
             _speak_pyttsx3(clean)
             return
-        wav_bytes = base64.b64decode(audios[0])
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-            f.write(wav_bytes)
-            tmp_path = f.name
-        players = ["aplay", "paplay", "afplay", "ffplay -nodisp -autoexit", "mpg123"]
-        played = False
-        for player in players:
-            if _shutil.which(player.split()[0]):
-                os.system(f"{player} {tmp_path} 2>/dev/null")
-                played = True
-                break
-        if not played:
-            os.unlink(tmp_path)
-            print(f"{AMBER}  No audio player found — using offline voice.{RESET}")
+
+        # ── Decode base64 WAV and write temp file ────────────────────────
+        try:
+            wav_bytes = base64.b64decode(audios[0])
+        except Exception as decode_err:
+            print(f"{RED}  TTS: base64 decode failed: {decode_err}{RESET}")
             _speak_pyttsx3(clean)
-        else:
+            return
+
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            tmp.write(wav_bytes)
+            tmp_path = tmp.name
+
+        # ── Play the WAV — try common Linux audio players in order ───────
+        players = [
+            "aplay",                        # ALSA (most common on Linux)
+            "paplay",                       # PulseAudio
+            "pw-play",                      # PipeWire
+            "ffplay -nodisp -autoexit -loglevel quiet",
+            "mpg123 -q",
+            "afplay",                       # macOS
+        ]
+        played = False
+        for player_cmd in players:
+            binary = player_cmd.split()[0]
+            if _shutil.which(binary):
+                exit_code = os.system(f"{player_cmd} {tmp_path} 2>/dev/null")
+                if exit_code == 0:
+                    played = True
+                    break
+                # If player exists but exited non-zero, try next
+        try:
             os.unlink(tmp_path)
+        except Exception:
+            pass
+
+        if not played:
+            print(f"{AMBER}  No audio player found (tried: aplay paplay pw-play ffplay mpg123).{RESET}")
+            print(f"{AMBER}  Install one: sudo apt install alsa-utils{RESET}")
+            _speak_pyttsx3(clean)
+
     except Exception as e:
         clear_line()
-        print(f"{RED}  TTS error: {e}{RESET}")
+        print(f"{RED}  TTS unexpected error: {e}{RESET}")
 
 
 
@@ -760,6 +1030,8 @@ def banner():
     lang_status = f"{CYAN}{SHELL_LANG}{RESET}"
     print(f"{DIM}  Type real Linux commands. AI watches for mistakes & danger.{RESET}")
     print(f"{DIM}  TTS: {tts_status}  │  Lang: {lang_status}  │  {BOLD}\"i wanna talk with you\"{RESET}{DIM} → chat  │  {BOLD}--help{RESET}{DIM} → guide{RESET}\n")
+    # Show sysinfo snapshot on every boot
+    show_sysinfo()
 
 # ── Prompts ───────────────────────────────────────────────────────────────────
 def shell_prompt():
@@ -1219,6 +1491,22 @@ def show_help():
   {AMBER}clear{RESET}                    clear screen
   {AMBER}exit / quit{RESET}              leave SaShell
 
+{CYAN}{BOLD}  SYSINFO{RESET}
+  {GREY}────────────────────────────────────────────────────────────{RESET}
+  {AMBER}sysinfo{RESET} / {AMBER}sys{RESET} / {AMBER}stats{RESET}    CPU · RAM · Disk · Uptime panel
+  {GREY}  Also shown automatically on every boot{RESET}
+
+{LAVENDER}{BOLD}  PLUGINS{RESET}
+  {GREY}────────────────────────────────────────────────────────────{RESET}
+  {AMBER}plugins{RESET}                  list all loaded plugins
+  {GREY}  Drop a .py file into: ~/.sashell/plugins/{RESET}
+  {GREY}  Required in each plugin file:{RESET}
+  {GREY}    PLUGIN_NAME = "cmd"     ← the command to type{RESET}
+  {GREY}    PLUGIN_HELP = "desc"    ← shown in plugin list{RESET}
+  {GREY}    def run(tokens, ctx):   ← called when cmd is typed{RESET}
+  {GREY}  ctx gives you: LIME/CYAN/AMBER/RED/GREY/RESET/BOLD,...{RESET}
+  {GREY}               speak(), run_command(), print_chat_reply(){RESET}
+
 {GREY}  🥚 Easter eggs hidden throughout. Explore.{RESET}
 {GREY}  ══════════════════════════════════════════════════════════════{RESET}
 """)
@@ -1271,6 +1559,12 @@ def main():
 
     banner()
     setup_readline()
+
+    # Load plugins from ~/.sashell/plugins/ — silent if none exist
+    _load_plugins()
+    if PLUGIN_REGISTRY:
+        names = ", ".join(PLUGIN_REGISTRY.keys())
+        print(f"  {LAVENDER}🔌 {len(PLUGIN_REGISTRY)} plugin(s) loaded: {CYAN}{names}{RESET}\n")
 
     if no_ai:
         print(f"{AMBER}  ⚡ --no-ai mode. Pure shell.{RESET}\n")
@@ -1362,6 +1656,23 @@ def main():
             print(f"  {GREY}Logging OFF{RESET}\n"); continue
         if lower == "log open":
             os.system(f"nano {LOG_FILE}"); continue
+
+        # ── Sysinfo ───────────────────────────────────────────────────────
+        if lower in ("sysinfo", "sys", "stats", "htop?"):
+            show_sysinfo(); continue
+
+        # ── Plugins list ──────────────────────────────────────────────────
+        if lower in ("plugins", "plugin list", "plugs"):
+            show_plugins(); continue
+
+        # ── Plugin dispatch — check if the command matches a loaded plugin ─
+        if tokens[0].lower() in PLUGIN_REGISTRY:
+            plug = PLUGIN_REGISTRY[tokens[0].lower()]
+            try:
+                plug["run"](tokens, _plugin_context())
+            except Exception as plug_err:
+                print(f"{RED}  Plugin '{plug['name']}' error: {plug_err}{RESET}\n")
+            continue
 
         # ── --command: plain English → shell command ──────────────────────
         if user_input.startswith("--command"):
