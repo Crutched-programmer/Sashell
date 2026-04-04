@@ -1,6 +1,6 @@
 # SaShell MK 2.0.4!!!
 
-Real Linux shell with Sarvam AI as your safety net. Type real commands — AI only steps in when something looks dangerous, broken, or funny.
+Real Linux shell with Sarvam AI as your safety net. Type real commands — AI only steps in when something looks dangerous, broken, or funny.<br>
 Go to the dist folder to find the .exe, download and enjoy! Or download the python file and run it in your terminal and enjoy!
 ---
 <h3>Change log :
