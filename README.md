@@ -12,6 +12,20 @@ Go to the dist folder to find the .exe, download and enjoy! Or download the pyth
 
 <img src='https://github.com/user-attachments/assets/ec5cbb1b-6dac-40c1-9cf5-6ff3397445d5' />
 
+---
+
+## Tech Stack
+
+| Component | Details |
+|-----------|---------|
+| Language | Python 3 — stdlib only for core |
+| AI Model | sarvam-m via Sarvam API |
+| TTS | Sarvam Bulbul v3 → pyttsx3 fallback |
+| Shell executor | subprocess.run(shell=True) |
+| History | readline — saved to ~/.pyshell_history |
+| API key | Hardcoded or env var SARVAM_API_KEY |
+
+---
 
 ## Installation
 
@@ -281,17 +295,4 @@ More are hidden. Explore.
 
 ---
 
-## Tech Stack
-
-| Component | Details |
-|-----------|---------|
-| Language | Python 3 — stdlib only for core |
-| AI Model | sarvam-m via Sarvam API |
-| TTS | Sarvam Bulbul v3 → pyttsx3 fallback |
-| Shell executor | subprocess.run(shell=True) |
-| History | readline — saved to ~/.pyshell_history |
-| API key | Hardcoded or env var SARVAM_API_KEY |
-
----
-
-*SaShell v0.9.0 — Stay chaotic. 🌀*
+*SaShell MK 2.0.4*
